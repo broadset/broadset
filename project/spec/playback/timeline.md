@@ -1,312 +1,290 @@
-# Timeline Specification
+# Playback — Sequence Evaluation Specification
 
 ## Purpose
 
-Defines how the system computes timeline durations, interpolated frames at arbitrary times, cumulative action state, child timeline composition, and cross-element target routing — all as pure functions with no DOM or side effects.
+Defines pure evaluation of canonical sequences, typed tracks/keyframes, child clips, state machines, lifecycle, looping, stagger, and cross-entity property targets at exact integer ticks. DOM scheduling and authoring UI are outside this file.
 
 ---
 
 ## Requirements
 
-### Requirement: Timeline Duration Computation
+### Requirement: Sequence Duration Computation
 
-The system MUST compute timeline duration as the maximum keyframe offset plus a default tween duration (300ms). The default tween duration of 300ms is a compile-time constant — it is NOT configurable per-timeline or per-document, and all timelines use the same default tween duration. Empty timelines MUST have duration `0`. Child timeline durations MUST be accounted for relative to their start offset.
+Every sequence MUST use its declared non-negative safe-integer `durationTicks` as its base duration. Track keyframes, markers, cues, work area, and child-clip output ranges MUST lie within that duration. Playback MUST NOT infer an implicit millisecond tail from the last keyframe. An empty sequence MAY declare `durationTicks: 0`; a non-empty sequence MUST declare a duration covering every contained tick and child output range.
 
-#### Scenario: Empty timeline
+Authoring commands MAY offer friendly default durations, but they MUST convert the chosen display duration through the document timebase and commit the resulting explicit integer `durationTicks` before validation.
 
-- GIVEN a timeline with no entries
-- WHEN duration is computed
-- THEN the result is `0`
+#### Scenario: Empty sequence
 
-#### Scenario: Multi-keyframe timeline
+- GIVEN a sequence with no tracks, markers, cues, or child clips and `durationTicks: 0`
+- WHEN its duration is read
+- THEN the result is exactly `0`
 
-- GIVEN keyframes at 0ms, 500ms, and 1000ms
-- WHEN duration is computed
-- THEN the result is `1300` (1000 + 300)
+#### Scenario: Keyframes within explicit duration
 
-#### Scenario: Child timeline extends parent duration
+- GIVEN a sequence with keyframes at ticks 0, 500, and 1000 and `durationTicks: 1300`
+- WHEN its duration is read
+- THEN the result is exactly `1300` without adding an implicit tail
 
-- GIVEN a parent trigger at 200ms and a child with 800ms max offset
-- WHEN parent duration is computed
-- THEN it accounts for 200 + 800 + 300 = 1300ms total
+#### Scenario: Child clip extends beyond duration
+
+- GIVEN a child clip whose output range ends after the parent `durationTicks`
+- WHEN semantic validation runs
+- THEN validation fails at the child output range
 
 #### Acceptance Criteria
 
-- [ ] Given a timeline with no entries, the result is `0`
-- [ ] Given keyframes at 0ms, 500ms, and 1000ms, the result is `1300` (1000 + 300)
-- [ ] Given a parent trigger at 200ms and a child with 800ms max offset, it accounts for 200 + 800 + 300 = 1300ms total
+- [ ] Given an empty sequence with `durationTicks: 0`, its duration is zero
+- [ ] Given keyframes within an explicit duration, evaluation uses the declared `durationTicks` unchanged
+- [ ] Given any contained tick or child output range beyond duration, semantic validation fails
+- [ ] No evaluator derives canonical duration from milliseconds or a hard-coded tween tail
 
 ---
 
-### Requirement: Timeline Frame Computation
+### Requirement: Sequence Frame Computation
 
-The system MUST compute the full interpolated frame (properties + action state) for any timeline at any arbitrary time. Before the first keyframe, properties MUST be empty. After the last keyframe, properties MUST hold the last keyframe's values.
+The system MUST compute resolved typed property contributions for a sequence at any valid exact tick. Each property track has one stable `PropertyTarget`, declared value type, and ordered typed keyframes. Before a track's first keyframe, that track contributes no value. At or after its last keyframe through `durationTicks`, it holds the last typed value unless the track's closed interpolation/segment contract states otherwise.
 
-#### Scenario: Linear interpolation between keyframes
+#### Scenario: Linear interpolation between numeric keyframes
 
-- GIVEN keyframes at 0ms (opacity=0) and 1000ms (opacity=1)
-- WHEN computed at 500ms
-- THEN `opacity` is `0.5`
+- GIVEN an opacity track with numeric keyframes 0 at tick 0 and 1 at tick 1000
+- WHEN computed at tick 500 with linear interpolation
+- THEN the typed opacity contribution is `0.5`
 
 #### Scenario: Step interpolation holds value
 
-- GIVEN keyframes at 0ms (visibility=hidden, step) and 500ms (visibility=visible, step)
-- WHEN computed at 250ms
-- THEN `visibility` is `hidden`
+- GIVEN a boolean target track with `false` at tick 0 and `true` at tick 500 using step interpolation
+- WHEN computed at tick 250
+- THEN the contribution is `false`
 
-#### Scenario: Before first keyframe returns empty
+#### Scenario: Before first keyframe contributes nothing
 
-- GIVEN a keyframe starting at 500ms
-- WHEN computed at 0ms
-- THEN properties are empty
+- GIVEN a property track whose first keyframe is at tick 500
+- WHEN computed at tick 0
+- THEN that track contributes no value
 
-#### Scenario: After last keyframe holds values
+#### Scenario: Terminal seek holds the final value
 
-- GIVEN keyframes ending at 300ms with opacity=1
-- WHEN computed at 5000ms
-- THEN `opacity` is `1`
+- GIVEN an opacity track ending at tick 300 with value 1 in a sequence whose duration is 5000 ticks
+- WHEN computed at tick 5000
+- THEN the typed opacity contribution is `1`
 
 #### Acceptance Criteria
 
-- [ ] Given keyframes at 0ms (opacity=0) and 1000ms (opacity=1), `opacity` is `0.5`
-- [ ] Given keyframes at 0ms (visibility=hidden, step) and 500ms (visibility=visible, step), `visibility` is `hidden`
-- [ ] Given a keyframe starting at 500ms, properties are empty
-- [ ] Given keyframes ending at 300ms with opacity=1, `opacity` is `1`
+- [ ] Numeric interpolation at an exact midpoint produces the type-correct midpoint
+- [ ] Step interpolation holds the prior typed value until the next keyframe tick
+- [ ] A track contributes nothing before its first keyframe
+- [ ] Interactive seek at `durationTicks` exposes terminal values without sampling timed media beyond its interval
 
 ---
 
-### Requirement: Deterministic State Derivation
+### Requirement: Deterministic State-Machine Derivation
 
-The system MUST derive element state (`activeState`, `modifiers`) at any time T as a **pure function** of the animation data. The derivation evaluates all keyframe action markers from t=0 to T in chronological offset order, applying each marker's state operation:
+Runtime state at tick T MUST derive from canonical state-machine definitions, lifecycle input, validated data, and the ordered typed runtime event log through T. Keyframes contain typed property values only; they MUST NOT contain `setState`, `addModifier`, or `removeModifier` action payloads.
 
-- `setState(payload)`: sets `activeState` to `payload` (or `null` if no payload)
-- `addModifier(payload)`: adds `payload` to the `modifiers` set
-- `removeModifier(payload)`: removes `payload` from the `modifiers` set
+Each state machine begins at its declared initial state. At each event tick, eligible transitions are evaluated using typed trigger, side-effect-free guard, and deterministic priority; the numerically lowest eligible priority wins. Optional transition sequence actions start referenced sequences at that exact tick. UI “modifier” affordances MAY author independent two-state machines (inactive/active), but no modifier set is serialized.
 
-**Determinism invariant:** The result at time T MUST be identical regardless of how T was reached — direct seek, forward playback, backward seek, or any sequence of seeks. There is no concept of "fired" vs "unfired" actions at this layer; every derivation evaluates the full marker history from t=0. Implementations MAY cache or optimize this (e.g., binary search on sorted markers), but MUST maintain equivalence with full replay.
+Direct seek, forward evaluation, backward seek, and repeated scrubbing MUST produce the same machine states and sequence-action schedule for identical inputs. Implementations MAY checkpoint derived state but MUST remain semantically equivalent to replaying the ordered event log from the initial state.
 
-**Default state (before any markers):** `activeState` is `null`, `modifiers` is the empty set.
+#### Scenario: State transition derives from event log
 
-**Unsorted markers:** If keyframe action markers arrive in non-chronological order, the system MUST sort them by `offsetMs` before evaluation.
+- GIVEN a state machine initially `idle` with an `activate` event transition to `active` at tick 500
+- WHEN state is derived at tick 250 and tick 750
+- THEN the state is `idle` at tick 250 and `active` at tick 750
 
-#### Scenario: setState derivation
+#### Scenario: Independent modifier-like state machines
 
-- GIVEN action markers: setState='IN' at 0ms, setState='active' at 500ms
-- WHEN state is derived at 250ms
-- THEN activeState is `IN`
-- AND when derived at 750ms, activeState is `active`
-
-#### Scenario: Modifier add and remove
-
-- GIVEN markers: addModifier='pulse' at 0ms, addModifier='glow' at 200ms, removeModifier='pulse' at 500ms
-- WHEN state is derived at 300ms
-- THEN modifiers contain `pulse` and `glow`
-- AND when derived at 600ms, modifiers contain only `glow`
+- GIVEN independent `pulse` and `glow` two-state machines with typed activation/deactivation events
+- WHEN `pulse` and `glow` activate by tick 300 and `pulse` deactivates at tick 500
+- THEN both are active at tick 300 and only `glow` is active after tick 500
 
 #### Scenario: Seek direction independence
 
-- GIVEN a forward derivation to 800ms then a backward derivation to 200ms
-- WHEN both results are inspected
-- THEN the 200ms result is identical to a fresh derivation at 200ms with no prior context
+- GIVEN sequential evaluation to tick 800 followed by a direct seek to tick 200
+- WHEN results are compared with a fresh evaluation at tick 200
+- THEN the state-machine states and active sequence actions are identical
 
-#### Scenario: Unsorted markers handled
+#### Scenario: Same-tick transitions use stable priority
 
-- GIVEN action markers in non-chronological order
-- WHEN state is derived
-- THEN markers are evaluated in offset order regardless of input order
-
-#### Scenario: No markers returns defaults
-
-- GIVEN an element with no keyframe action markers
-- WHEN state is derived at any time T
-- THEN activeState is `null` and modifiers is empty
+- GIVEN multiple eligible transitions for one source state and trigger at the same tick
+- WHEN they are evaluated
+- THEN the unique numerically lowest priority transition wins
 
 #### Acceptance Criteria
 
-- [ ] Given action markers setState='IN' at 0ms, setState='active' at 500ms, at 250ms activeState is 'IN' and at 750ms activeState is 'active'
-- [ ] Given markers addModifier='pulse' at 0ms, addModifier='glow' at 200ms, removeModifier='pulse' at 500ms, at 300ms modifiers are {pulse, glow} and at 600ms modifiers are {glow}
-- [ ] Given forward derivation to 800ms then backward to 200ms, the result matches fresh derivation at 200ms
-- [ ] Given markers in non-chronological order, they are evaluated in offset order
-- [ ] Given no action markers, activeState is null and modifiers is empty at all times
-- [ ] Given the same animation data and time T, the result is identical regardless of how T was reached
+- [ ] Given identical canonical data, runtime event log, validated data, and tick, state derivation is identical regardless of seek history
+- [ ] Given independent two-state machines, each derives independently without a serialized modifier set
+- [ ] Given same-tick eligible transitions, deterministic priority selects one result
+- [ ] Given a stale sequence action or state reference, semantic validation fails before playback
+- [ ] Canonical keyframes never store state/modifier action markers
 
 ---
 
-### Requirement: Child Timeline Composition
+### Requirement: Child Sequence Clip Composition
 
-The system MUST compute child timeline frames relative to their parent start offset. Child timelines that have not started MUST not appear in the frame.
+The system MUST compute referenced child sequences relative to each canonical child clip's exact output range, source range, direction, and typed time remap. A child clip contributes nothing before its output start or after its output end. Child sequence definitions remain referenced by stable ID and dependency graphs MUST be acyclic.
 
-#### Scenario: Child starts at parent start offset
+#### Scenario: Child starts at output start tick
 
-- GIVEN a parent start offset at 500ms for a child timeline
-- WHEN parent is computed at 400ms
-- THEN no child frames are present
-- AND at 600ms child frames reflect 100ms of child playback
+- GIVEN a child clip with output range `[500, 1500]` and source range `[0, 1000]`
+- WHEN the parent is evaluated at tick 400 and tick 600
+- THEN the child contributes nothing at tick 400 and samples source tick 100 at tick 600
 
 #### Scenario: Child properties interpolate
 
-- GIVEN a child starting at 200ms with keyframes at 0ms and 1000ms
-- WHEN parent is computed at 700ms
-- THEN child frame properties reflect 500ms progress (50%)
+- GIVEN a child clip starting at parent tick 200 whose source property track spans ticks 0 through 1000
+- WHEN the parent is computed at tick 700
+- THEN the child samples source tick 500 and contributes 50% progress
 
 #### Acceptance Criteria
 
-- [ ] Given a parent start offset at 500ms for a child timeline, no child frames are present and at 600ms child frames reflect 100ms of child playback
-- [ ] Given a child starting at 200ms with keyframes at 0ms and 1000ms, child frame properties reflect 500ms progress (50%)
+- [ ] Child sampling uses exact source/output tick mapping
+- [ ] Child clips outside their output range contribute nothing
+- [ ] Cyclic or stale child-sequence references fail semantic validation
 
 ---
 
-### Requirement: Target Property Routing
+### Requirement: Stable Target Property Routing
 
-The system MUST route keyframe properties with an explicit `target` to a separate `targetProperties` map, not to the owner's properties.
+Every property track MUST contribute to its declared stable `PropertyTarget`—an entity address plus schema-approved RFC 6901 pointer. Resolved contributions MUST retain target and provenance; they MUST NOT be split into owner-relative generic property bags or addressed by element indexes.
 
 #### Scenario: Cross-element targeting
 
-- GIVEN keyframes targeting `other-el` with opacity 0→1
-- WHEN computed at midpoint
-- THEN `targetProperties['other-el'].opacity` is `0.5`
-- AND owner `properties.opacity` is undefined
+- GIVEN an opacity track targeting element `other-el` through its stable entity address and appearance pointer
+- WHEN computed at the midpoint
+- THEN the resolved contribution for that exact target is opacity `0.5`
+- AND no contribution is attributed to the sequence's authoring-context element
 
 #### Acceptance Criteria
 
-- [ ] Given keyframes targeting `other-el` with opacity 0→1, `targetProperties['other-el'].opacity` is `0.5` and owner `properties.opacity` is undefined
+- [ ] Cross-entity tracks route only to their declared stable targets
+- [ ] Resolved values retain sequence, track, keyframe-segment, and overridden-value provenance
+- [ ] Stale, wrong-kind, or type-incompatible targets fail semantic validation
 
 ---
 
-### Requirement: Element Timeline Batch Computation
+### Requirement: Element Track Batch Computation
 
-The system MUST compute all named timelines for an element at a given time from the animations array. Elements with no animation entry MUST return an empty array.
+The system MUST compute all active sequence tracks targeting an element at an exact tick from document-owned and expanded component-owned sequences. Elements with no targeted tracks return an empty contribution list.
 
-#### Scenario: No timelines returns empty
+#### Scenario: No tracks returns empty
 
-- GIVEN a missing element ID
-- WHEN all timelines are computed
-- THEN the result is an empty array
+- GIVEN a resolving element ID with no active targeted tracks
+- WHEN contributions are computed
+- THEN the result is an empty list
 
-#### Scenario: Multiple timelines computed
+#### Scenario: Multiple sequences contribute
 
-- GIVEN an element with intro and outro timelines
-- WHEN computed at 250ms
-- THEN both timeline frames are returned with correct interpolated values
+- GIVEN lifecycle and state-machine sequence actions whose tracks target one element
+- WHEN computed at an exact tick where both are active
+- THEN both typed contributions are returned with precedence/provenance resolved deterministically
 
 #### Acceptance Criteria
 
-- [ ] Given a missing element ID, the result is an empty array
-- [ ] Given an element with intro and outro timelines, both timeline frames are returned with correct interpolated values
+- [ ] Given no active targeted tracks, the result is empty
+- [ ] Given multiple active sequence contributions, resolution precedence and provenance are deterministic
 
 ---
 
-### Requirement: Loop Duration Computation
+### Requirement: Loop Duration and Tick Mapping
 
-When a timeline has `loop` mode `'loop'` or `'ping-pong'`, the timeline computation MUST extend the effective timeline duration to account for repeated iterations. For `'loop'` mode with `loopCount: N`, the effective duration is `baseDuration × N`. For `'ping-pong'` mode with `loopCount: N`, the effective duration is `baseDuration × N` (each iteration includes one forward and one reverse pass, so the contained tween duration per iteration equals the base). For `loopCount: null` (infinite), the effective duration is `Infinity` — the timeline never completes on its own. The `computeAt(timeMs)` function MUST map the absolute time to the correct position within the current iteration using modular arithmetic: `effectiveTime = timeMs % baseDuration` for loop mode, and for ping-pong `iterationIndex = floor(timeMs / baseDuration)`, odd iterations reverse the effectiveTime.
+Canonical loop configuration MUST map transport ticks to exact sequence ticks without floating-point accumulation. A finite loop count has derived transport duration `durationTicks × count`. An unbounded loop has no finite completion tick; runtime APIs MAY expose that as `null` or an explicit unbounded variant, but canonical JSON MUST NOT store `Infinity`. Ping-pong mapping reverses odd iterations while retaining integer ticks.
 
-#### Scenario: Loop mode duration with finite count
+#### Scenario: Finite loop duration
 
-- GIVEN a timeline with 1000ms base duration, `loop: 'loop'`, `loopCount: 3`
-- WHEN the effective duration is computed
-- THEN the result is 3000ms
+- GIVEN a sequence with `durationTicks: 1000`, loop mode `loop`, and count 3
+- WHEN derived transport duration is computed
+- THEN it is exactly 3000 ticks
 
-#### Scenario: Ping-pong time mapping
+#### Scenario: Ping-pong tick mapping
 
-- GIVEN a timeline with 1000ms base duration, `loop: 'ping-pong'`
-- WHEN computed at time 1500ms (iteration 1, which is reverse)
-- THEN the effective position within the timeline is 500ms from the end → same as 500ms forward
+- GIVEN `durationTicks: 1000` in ping-pong mode
+- WHEN transport tick 1500 is mapped
+- THEN the effective sequence position is tick 500 on the reverse iteration
 
-#### Scenario: Infinite loop duration
+#### Scenario: Unbounded loop
 
-- GIVEN a timeline with `loop: 'loop'` and `loopCount: null`
-- WHEN the effective duration is queried
-- THEN the result is `Infinity`
-
-#### Scenario: Non-looping timeline unchanged
-
-- GIVEN a timeline with `loop: 'none'`
-- WHEN the effective duration is computed
-- THEN the result equals the base duration
+- GIVEN an unbounded loop definition
+- WHEN completion is queried
+- THEN the runtime result is explicitly unbounded and no non-JSON numeric value is serialized
 
 #### Acceptance Criteria
 
-- [ ] Given loop mode with `loopCount: N`, effective duration is `baseDuration × N`
-- [ ] Given ping-pong mode, odd iterations reverse the time mapping
-- [ ] Given `loopCount: null`, effective duration is `Infinity`
-- [ ] Given `loop: 'none'`, duration computation is unchanged from existing behavior
+- [ ] Finite loops derive exact safe-integer transport durations
+- [ ] Odd ping-pong iterations reverse exact tick mapping
+- [ ] Unbounded loops never serialize `Infinity`
+- [ ] Non-looping sequences retain their declared duration
 
 ---
 
-### Requirement: Stagger Offset Computation
+### Requirement: Deterministic Stagger Offsets
 
-When a parent timeline has a `stagger` configuration on its child bindings, the timeline computation MUST automatically offset each child's effective start time. The stagger delay for child at index `i` (0-based) depends on the direction:
-
-- `'normal'`: child `i` starts at `baseOffset + (i × delayMs)`
-- `'reverse'`: child `i` starts at `baseOffset + ((childCount - 1 - i) × delayMs)`
-- `'center'`: child `i` starts at `baseOffset + (distanceFromCenter × delayMs)` where `distanceFromCenter = abs(i - (childCount - 1) / 2)` rounded down
-
-The stagger offset is additive with any existing start offset on the child binding. The parent timeline's effective duration MUST account for the maximum stagger offset (last child's start + child duration).
+Typed child-clip stagger parameters MUST produce exact integer tick offsets from canonical child order and a stored deterministic seed where randomization applies. Normal, reverse, and center direction preserve the existing visual ordering behavior. The maximum derived stagger offset plus child output duration MUST remain within the parent sequence duration.
 
 #### Scenario: Normal stagger offsets
 
-- GIVEN 4 children with stagger `{ delayMs: 200, direction: 'normal' }`
-- WHEN child start times are computed
-- THEN offsets are 0, 200, 400, 600ms
+- GIVEN four children with delay 200 ticks and direction `normal`
+- WHEN offsets are derived
+- THEN they are 0, 200, 400, and 600 ticks
 
 #### Scenario: Center stagger with odd count
 
-- GIVEN 5 children with stagger `{ delayMs: 100, direction: 'center' }`
-- WHEN child start times are computed
-- THEN center child (index 2) starts first at +0ms, adjacent at +100ms, outer at +200ms
+- GIVEN five children with delay 100 ticks and direction `center`
+- WHEN offsets are derived
+- THEN the center starts at 0, adjacent children at 100, and outer children at 200 ticks
 
-#### Scenario: Stagger extends parent duration
+#### Scenario: Stagger must fit duration
 
-- GIVEN 3 children with 500ms timelines and stagger `{ delayMs: 200, direction: 'normal' }`
-- WHEN the parent effective duration is computed
-- THEN it accounts for the last child completing at 400ms + 500ms = 900ms
+- GIVEN three child clips with duration 500 ticks and normal stagger delay 200 ticks
+- WHEN semantic validation runs against a parent duration below 900 ticks
+- THEN validation fails because the last child completion is out of range
 
 #### Acceptance Criteria
 
-- [ ] Given normal stagger, children are offset by increasing multiples of delayMs
-- [ ] Given reverse stagger, the last child in document order starts first
-- [ ] Given center stagger, center children start first and outer children are delayed
-- [ ] Given stagger, the parent timeline effective duration accounts for the last child's completion
+- [ ] Normal, reverse, and center stagger preserve deterministic child-order behavior
+- [ ] Randomized stagger repeats identically from the stored seed
+- [ ] Parent duration covers every derived child completion tick
 
 ---
 
-### Requirement: Motion Path Position Interpolation
+### Requirement: Spatial-Path Transform Interpolation
 
-When a keyframe pair includes a `motionPath` field, the timeline computation MUST interpolate the element's `x` and `y` position along the SVG path arc instead of linearly. The path MUST be sampled at uniform arc-length intervals (not uniform parameter `t`) to ensure constant perceived speed. When `motionRotate` is `true`, the timeline MUST also output a `rotation` value equal to the tangent angle (in degrees) at the current path position, added to the element's base rotation. The motion path interpolation MUST use the same easing function applied to other properties in the keyframe.
+A compatible transform track MAY use the closed spatial-path interpolation variant with typed structured path geometry, arc-length sampling, easing, and optional tangent orientation. Evaluation MUST output the target's type-compatible exact transform value; it MUST NOT persist generic `x`, `y`, `rotation`, `motionPath`, or raw SVG path fields.
 
 #### Scenario: Arc-length position sampling
 
-- GIVEN a semicircular motion path from (0,0) to (200,0) via (100,100)
-- WHEN interpolated at t=0.5 using linear easing
-- THEN the position is at the arc midpoint (near the apex), not at the linear midpoint (100,0)
+- GIVEN a curved typed spatial path and linear easing
+- WHEN interpolated at normalized progress 0.5
+- THEN translation lies at the arc midpoint rather than the straight-line midpoint
 
-#### Scenario: Motion rotate outputs tangent angle
+#### Scenario: Tangent orientation
 
-- GIVEN a motion path with `motionRotate: true` and a 90° right turn
-- WHEN interpolated at the turn point
-- THEN the output rotation reflects the tangent direction at that point
+- GIVEN spatial-path interpolation with tangent orientation enabled
+- WHEN evaluated at a turn
+- THEN the exact transform includes the tangent-aligned orientation composed with the base transform
 
-#### Scenario: Easing applied to path progress
+#### Scenario: Easing applies to path progress
 
-- GIVEN a motion path with `ease-in` easing
-- WHEN interpolated at t=0.5
-- THEN the arc-length progress is less than 50% (ease-in starts slowly)
+- GIVEN spatial-path interpolation with ease-in
+- WHEN evaluated at normalized time 0.5
+- THEN arc-length progress is below 50%
 
 #### Acceptance Criteria
 
-- [ ] Given a curved motionPath, position samples are at uniform arc-length intervals
-- [ ] Given `motionRotate: true`, the output includes a rotation value matching the path tangent angle
-- [ ] Given a motionPath with easing, the easing function is applied to the arc-length progress
+- [ ] Spatial paths sample by uniform arc length
+- [ ] Optional tangent orientation composes into the exact target transform
+- [ ] Easing applies before arc-length lookup
+- [ ] Structured path identity and typed transform output remain canonical
 
 ---
 
 ## Spec Gaps
 
-- [ ] **Proposed exact timebase and duration contract:** ADR-003/006 proposes replacing the current `0`-for-empty and 300 ms tail rules with a rational timebase and a different default-duration model. The current requirement above remains authoritative unless an authorized maintainer explicitly ratifies that behavioral change and updates its scenarios, migration impact, and cross-package tests.
+- Exact closed field tables for loop, child-clip remap, stagger, and spatial interpolation are finalized by the exact-time implementation program without changing these semantics.
 
 ---
 
 ## Non-Goals
 
 - Easing and value interpolation math → see [interpolation.md](interpolation.md)
-- DOM playback and style application → see [playback.md](playback.md)
+- DOM playback and scheduling → see [playback.md](playback.md)

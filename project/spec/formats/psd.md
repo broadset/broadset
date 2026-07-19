@@ -17,20 +17,20 @@ Every PSD Broadset writes carries two collaborating layers. This is the concrete
 Native PSD primitives map every Broadset feature that has a PSD counterpart:
 
 - **Text layers** with full run styling (family, weight, italic, size, tracking, leading, alignment, decoration, color) via PSD's text engine data.
-- **Vector shape layers** with editable paths for rectangles, ellipses, and arbitrary `path` elements. Rounded rectangles use PSD's native rounded-rectangle primitive where possible and knot-composed cubic segments otherwise.
+- **Vector shape layers** with editable paths for vector rectangle, ellipse, and structured-path subtypes. Rounded rectangles use PSD's native primitive where possible and knot-composed cubic segments otherwise.
 - **Bitmap layers** for `image` elements and for elements that PSD cannot represent natively (last-resort rasterization via `modern-screenshot`).
 - **Smart objects** — embedded (data URI / ZIP-resolved) and linked (external path with GUID identity preserved).
 - **Layer groups** for Broadset `'group'` elements via `parentId` tree; child transforms compose normally; group-level opacity, blend mode, and effects preserved.
-- **Masks** — vector masks (SVG path → PSD vector path), bitmap layer masks (alpha channel), clipping masks (clip-to-layer-below).
-- **Layer effects** — all ten (drop shadow, inner shadow, outer glow, inner glow, bevel, satin, color overlay, gradient overlay, pattern overlay, stroke) with bidirectional CSS `boxShadow` / `filter` / `FilterPrimitive[]` mapping.
+- **Masks** — typed vector-reference masks map to PSD vector paths; bitmap masks map to alpha channels; clipping masks map to clip-to-layer-below.
+- **Layer effects** — all ten PSD effects map bidirectionally to the closed typed appearance/effect union where representable; PSD-only parameters remain in interop preserved fragments.
 - **Blend modes** — PSD blend mode bidirectional map covering every CSS `mix-blend-mode` plus PSD-only modes (vivid light, linear light, pin light, hard mix, etc.) preserved via the extension blob when CSS has no equivalent.
 - **Artboards** for multi-page documents — each page becomes a PSD artboard.
-- **Color mode and ICC profile** — RGB / CMYK / Lab / Grayscale per document; ICC profile embedded when `document.outputIntent.iccProfileAssetId` is set.
+- **Color mode and ICC profile** — RGB, CMYK, Lab, or Grayscale follows `document.color.workingSpace`; the ICC profile referenced by `document.color.outputIntent.iccProfileAssetId` is embedded when declared.
 
 ### Metadata layer — Broadset semantics PSD cannot express visually
 
-- **Document XMP under the shared `broadset:` namespace** (IO-D-08) — project settings, canvas unit/dpi, asset registry, data schema, page definitions with their override maps, Dublin Core metadata from `document.metadata`, `document.outputIntent` referencing an `icc-profile` asset. Animation data is NOT serialized (see "Animated elements" below — PSD is a static carrier per IO-D-16).
-- **Per-layer `additionalInfo` under the `BsPs` signature** — each exported layer carries the element's stable `id`, `extensions.psd.dirty` flag, data bindings (`dataField`, `visibleWhen`, `repeater`), and a preservation blob for any PSD feature the importer recognized but cannot represent natively (adjustment layer parameters, unknown effects, exotic layer types). Photoshop preserves unknown `additionalInfo` across save — the same mechanism Illustrator, Sketch, and Affinity use to round-trip their own app state through PSD. Animation references are NOT carried here — PSD is a static carrier per IO-D-16.
+- **Document XMP under the shared `broadset:` namespace** (IO-D-08) — a defined canonical v1 projection covering project identity, surface/color configuration, resource references, pages/instances, stable bindings, and document metadata. Runtime sequences are not serialized; PSD is a static carrier.
+- **Per-layer `additionalInfo` under the `BsPs` signature** — each exported layer may carry stable source identity, baseline semantic hash, and relevant binding IDs. Preserved PSD-only data remains a content-addressed blob referenced by a project interop record. Photoshop preserves unknown `additionalInfo` across save; PSD remains a static carrier.
 
 ### Tag-stripping fallback
 
@@ -46,59 +46,59 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 - **metadata-preserved** — round-tripped via XMP or `additionalInfo`; not visible in the PSD layer but the user sees it in Broadset after re-import.
 - **dropped** — the feature is not representable; deliberately omitted on export, flagged on import.
 
-| Domain            | Feature                                                           | Export                          | Import                      | Round-trip                                                                     |
-| ----------------- | ----------------------------------------------------------------- | ------------------------------- | --------------------------- | ------------------------------------------------------------------------------ |
-| Text              | Single-run plain text                                             | native                          | native                      | native                                                                         |
-| Text              | Multi-run styled text (`TextBody` + `Paragraph` + `Run`)          | native                          | native                      | native                                                                         |
-| Text              | Paragraph style (alignment, leading, tracking, first-line indent) | native                          | native                      | native                                                                         |
-| Text              | Font resolution + fallback                                        | native                          | native                      | native                                                                         |
-| Text              | Text decoration (underline, strike)                               | native                          | native                      | native                                                                         |
-| Text              | Text-on-path                                                      | dropped                         | metadata-preserved          | metadata-preserved                                                             |
-| Text              | Bullets + numbered lists                                          | native                          | native                      | native                                                                         |
-| Vector            | Rectangle / ellipse / path                                        | native                          | native                      | native                                                                         |
-| Vector            | Rounded rectangle (`borderRadius`)                                | native                          | native                      | native                                                                         |
-| Vector            | Stroke (cap / join / dasharray / miterlimit / arrowheads)         | native                          | native                      | native                                                                         |
-| Vector            | Fill — solid colour                                               | native                          | native                      | native                                                                         |
-| Vector            | Fill — gradient (linear / radial / conic)                         | native                          | native                      | native                                                                         |
-| Vector            | Fill — pattern                                                    | native                          | native                      | native                                                                         |
-| Vector            | Fill — picture                                                    | native                          | native                      | native                                                                         |
-| Raster            | Plain bitmap layer (8-bit)                                        | native                          | native                      | native                                                                         |
-| Raster            | 16-bit / 32-bit channels                                          | native                          | native                      | native                                                                         |
-| Raster            | ICC profile on image asset                                        | native                          | native                      | native                                                                         |
-| Raster            | Last-resort rasterisation fallback                                | native                          | n/a                         | metadata-preserved                                                             |
-| Groups            | `'group'` element ↔ PSD layer group                               | native                          | native                      | native                                                                         |
-| Groups            | Nested groups + composed transforms                               | native                          | native                      | native                                                                         |
-| Groups            | Group-level opacity / blend mode / effects                        | native                          | native                      | native                                                                         |
-| Masks             | Vector mask                                                       | native                          | native                      | native                                                                         |
-| Masks             | Bitmap layer mask (alpha channel)                                 | native                          | native                      | native                                                                         |
-| Masks             | Clipping mask (clip-to-layer-below)                               | native                          | native                      | native                                                                         |
-| Masks             | Boolean mask ops (add / subtract / intersect / exclude)           | native                          | native                      | native                                                                         |
-| Effects           | Drop shadow                                                       | native                          | native                      | native                                                                         |
-| Effects           | Inner shadow                                                      | native                          | native                      | native                                                                         |
-| Effects           | Outer glow / inner glow                                           | native                          | native                      | native                                                                         |
-| Effects           | Bevel / emboss                                                    | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
-| Effects           | Satin                                                             | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
-| Effects           | Colour overlay / gradient overlay                                 | native                          | native                      | native                                                                         |
-| Effects           | Pattern overlay                                                   | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
-| Effects           | Stroke (layer effect)                                             | native                          | native                      | native                                                                         |
-| Smart objects     | Embedded smart object                                             | native                          | native                      | native                                                                         |
-| Smart objects     | Linked smart object (external file + GUID)                        | native                          | native                      | native                                                                         |
-| Colour            | RGB 8-bit                                                         | native                          | native                      | native                                                                         |
-| Colour            | CMYK (8- or 16-bit) with embedded ICC                             | native                          | native                      | native                                                                         |
-| Colour            | Lab with embedded ICC                                             | native                          | native                      | native                                                                         |
-| Colour            | Grayscale with embedded ICC                                       | native                          | native                      | native                                                                         |
-| Colour            | Spot colours                                                      | native                          | native                      | native                                                                         |
-| Colour            | `BroadsetColor.originalColor` preservation                        | n/a                             | native                      | native                                                                         |
-| Blend             | CSS-equivalent blend modes                                        | native                          | native                      | native                                                                         |
-| Blend             | PSD-only blend modes                                              | native (CSS fallback on render) | metadata-preserved + native | native                                                                         |
-| Metadata          | Document XMP `broadset:` namespace                                | native                          | native                      | native                                                                         |
-| Metadata          | Per-layer `BsPs` `additionalInfo` signature                       | native                          | native                      | native                                                                         |
-| Metadata          | Content-hash fallback when tags stripped                          | n/a                             | native                      | native                                                                         |
-| Metadata          | `document.metadata` (Dublin Core)                                 | native (XMP)                    | native (XMP)                | native                                                                         |
-| Metadata          | `document.outputIntent` ICC reference                             | native                          | native                      | native                                                                         |
-| Animation         | Animations (`animations` array, keyframes)                        | dropped (exported IN state)     | dropped                     | dropped — animations are not serialized to XMP or `additionalInfo` per IO-D-16 |
-| Data binding      | `dataField`, `visibleWhen`, `repeater`                            | metadata-preserved              | metadata-preserved          | metadata-preserved                                                             |
-| Adjustment layers | Curves / levels / hue-sat / color-balance on import               | n/a                             | metadata-preserved          | metadata-preserved                                                             |
+| Domain            | Feature                                                           | Export                          | Import                      | Round-trip                             |
+| ----------------- | ----------------------------------------------------------------- | ------------------------------- | --------------------------- | -------------------------------------- |
+| Text              | Single-run plain text                                             | native                          | native                      | native                                 |
+| Text              | Multi-run styled text (`TextBody` + `Paragraph` + `Run`)          | native                          | native                      | native                                 |
+| Text              | Paragraph style (alignment, leading, tracking, first-line indent) | native                          | native                      | native                                 |
+| Text              | Font resolution + fallback                                        | native                          | native                      | native                                 |
+| Text              | Text decoration (underline, strike)                               | native                          | native                      | native                                 |
+| Text              | Text-on-path                                                      | dropped                         | metadata-preserved          | metadata-preserved                     |
+| Text              | Bullets + numbered lists                                          | native                          | native                      | native                                 |
+| Vector            | Rectangle / ellipse / path                                        | native                          | native                      | native                                 |
+| Vector            | Rounded rectangle (`geometryData.cornerRadii`)                    | native                          | native                      | native                                 |
+| Vector            | Stroke (cap / join / dasharray / miterlimit / arrowheads)         | native                          | native                      | native                                 |
+| Vector            | Fill — solid colour                                               | native                          | native                      | native                                 |
+| Vector            | Fill — gradient (linear / radial / conic)                         | native                          | native                      | native                                 |
+| Vector            | Fill — pattern                                                    | native                          | native                      | native                                 |
+| Vector            | Fill — picture                                                    | native                          | native                      | native                                 |
+| Raster            | Plain bitmap layer (8-bit)                                        | native                          | native                      | native                                 |
+| Raster            | 16-bit / 32-bit channels                                          | native                          | native                      | native                                 |
+| Raster            | ICC profile on image asset                                        | native                          | native                      | native                                 |
+| Raster            | Last-resort rasterisation fallback                                | native                          | n/a                         | metadata-preserved                     |
+| Groups            | `'group'` element ↔ PSD layer group                               | native                          | native                      | native                                 |
+| Groups            | Nested groups + composed transforms                               | native                          | native                      | native                                 |
+| Groups            | Group-level opacity / blend mode / effects                        | native                          | native                      | native                                 |
+| Masks             | Vector mask                                                       | native                          | native                      | native                                 |
+| Masks             | Bitmap layer mask (alpha channel)                                 | native                          | native                      | native                                 |
+| Masks             | Clipping mask (clip-to-layer-below)                               | native                          | native                      | native                                 |
+| Masks             | Boolean mask ops (add / subtract / intersect / exclude)           | native                          | native                      | native                                 |
+| Effects           | Drop shadow                                                       | native                          | native                      | native                                 |
+| Effects           | Inner shadow                                                      | native                          | native                      | native                                 |
+| Effects           | Outer glow / inner glow                                           | native                          | native                      | native                                 |
+| Effects           | Bevel / emboss                                                    | metadata-preserved              | metadata-preserved          | metadata-preserved                     |
+| Effects           | Satin                                                             | metadata-preserved              | metadata-preserved          | metadata-preserved                     |
+| Effects           | Colour overlay / gradient overlay                                 | native                          | native                      | native                                 |
+| Effects           | Pattern overlay                                                   | metadata-preserved              | metadata-preserved          | metadata-preserved                     |
+| Effects           | Stroke (layer effect)                                             | native                          | native                      | native                                 |
+| Smart objects     | Embedded smart object                                             | native                          | native                      | native                                 |
+| Smart objects     | Linked smart object (external file + GUID)                        | native                          | native                      | native                                 |
+| Colour            | RGB 8-bit                                                         | native                          | native                      | native                                 |
+| Colour            | CMYK (8- or 16-bit) with embedded ICC                             | native                          | native                      | native                                 |
+| Colour            | Lab with embedded ICC                                             | native                          | native                      | native                                 |
+| Colour            | Grayscale with embedded ICC                                       | native                          | native                      | native                                 |
+| Colour            | Spot colours                                                      | native                          | native                      | native                                 |
+| Colour            | Authoritative typed color channels + producer syntax interop      | n/a                             | native                      | native                                 |
+| Blend             | CSS-equivalent blend modes                                        | native                          | native                      | native                                 |
+| Blend             | PSD-only blend modes                                              | native (CSS fallback on render) | metadata-preserved + native | native                                 |
+| Metadata          | Document XMP `broadset:` namespace                                | native                          | native                      | native                                 |
+| Metadata          | Per-layer `BsPs` `additionalInfo` signature                       | native                          | native                      | native                                 |
+| Metadata          | Content-hash fallback when tags stripped                          | n/a                             | native                      | native                                 |
+| Metadata          | `document.metadata` (Dublin Core)                                 | native (XMP)                    | native (XMP)                | native                                 |
+| Metadata          | `document.color.outputIntent` ICC reference                       | native                          | native                      | native                                 |
+| Animation         | Sequences/state resolved at declared export tick                  | dropped after resolution        | dropped                     | static PSD stores no runtime animation |
+| Data binding      | Stable binding IDs, field-ID expressions, typed repeaters         | metadata-preserved              | metadata-preserved          | metadata-preserved                     |
+| Adjustment layers | Curves / levels / hue-sat / color-balance on import               | n/a                             | metadata-preserved          | metadata-preserved                     |
 
 ---
 
@@ -169,7 +169,7 @@ Text content MUST round-trip as structured `TextBody` / `Paragraph` / `Run` data
 
 - GIVEN a PSD text layer with three `styleRun` entries of different sizes
 - WHEN imported
-- THEN the resulting text element's `content` is a `TextBody` with three `Run` entries, each matching the source size
+- THEN the resulting text element's `text` is a `TextBody` with three stable runs, each matching the source size
 
 #### Acceptance Criteria
 
@@ -177,24 +177,24 @@ Text content MUST round-trip as structured `TextBody` / `Paragraph` / `Run` data
 - [ ] PSD `styleRun` entries map one-to-one to Broadset `Run` entries on import
 - [ ] Paragraph-level style (alignment, leading, tracking, first-line indent) round-trips
 - [ ] Text decoration (underline, strike) round-trips
-- [ ] A single-run plain string flattens back to `string` content on re-import (greenfield model allows both `string` and `TextBody` per [model/element.md](../model/element.md))
+- [ ] A single-run source still imports as structured paragraph/run data; canonical text never flattens to a string alternative
 
 ---
 
 ### Requirement: Native Shape Layer Export
 
-Rectangle, ellipse, and path elements MUST export PSD vector shape metadata (`vectorFill`, `vectorStroke`, and `vectorMask`) so Photoshop can preserve shape geometry. Rounded corners use the native rounded-rectangle primitive where possible. Exporters MAY include a minimal layer pixel body when a PSD writer requires `imageData`/canvas channels to preserve non-zero Photoshop layer bounds; that pixel body is compatibility scaffolding, not the source of shape geometry.
+Vector rectangle, ellipse, and structured-path subtypes MUST export PSD vector shape metadata (`vectorFill`, `vectorStroke`, and `vectorMask`) so Photoshop preserves editable geometry. Rounded corners use the native primitive where possible. Exporters MAY include a minimal pixel body when a PSD writer requires image channels for non-zero layer bounds; it is compatibility scaffolding, not the geometry source.
 
 #### Scenario: Rounded rectangle preserves editability
 
-- GIVEN a Broadset rectangle with `borderRadius: 12`
+- GIVEN a Broadset vector rectangle with uniform `geometryData.cornerRadii: [12, 12, 12, 12]`
 - WHEN exported to PSD and re-opened in Photoshop
 - THEN the layer is a rounded-rectangle vector shape with the corner-radius editable in Photoshop's Properties panel
 
 #### Acceptance Criteria
 
-- [ ] Rectangle / ellipse / path elements emit PSD vector shape metadata; any emitted pixel body MUST preserve Photoshop-openable non-zero bounds and MUST NOT replace the vector geometry contract
-- [ ] `borderRadius` round-trips via the native rounded-rectangle primitive when all four corners match; otherwise via knot-composed cubic segments
+- [ ] Vector rectangle, ellipse, and structured-path subtypes emit PSD vector metadata; any pixel body preserves Photoshop-openable bounds and never replaces vector geometry
+- [ ] `geometryData.cornerRadii` round-trip via the native rounded-rectangle primitive when all four values match; otherwise via knot-composed cubic segments
 - [ ] Stroke styling (cap, join, dasharray, miterlimit) round-trips
 - [x] Rotation composes into the exported layer geometry — image rotation flows through `placedLayer.transform`; non-image (rectangle / ellipse / path) rotation expands the layer AABB and re-normalises vector-mask path knots so Photoshop reads back a rotated shape
 
@@ -202,7 +202,7 @@ Rectangle, ellipse, and path elements MUST export PSD vector shape metadata (`ve
 
 ### Requirement: Layer Effects Round-Trip (All Ten)
 
-All ten PSD layer effects MUST round-trip: drop shadow, inner shadow, outer glow, inner glow, bevel/emboss, satin, colour overlay, gradient overlay, pattern overlay, stroke. Effects with a CSS equivalent use native Broadset fields (`FilterPrimitive[]` for shadows/glows, `stroke*` for stroke). Effects without a CSS equivalent (bevel, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
+All ten PSD layer effects MUST round-trip. Effects in the closed canonical effect/appearance union map natively. PSD-only effects use interop preserved fragments with baseline semantic hashes so baseline-equal re-export remains byte-identical.
 
 #### Scenario: CSS-mappable effect
 
@@ -215,14 +215,14 @@ All ten PSD layer effects MUST round-trip: drop shadow, inner shadow, outer glow
 - GIVEN a PSD layer with a bevel/emboss effect
 - WHEN imported into Broadset and re-exported
 - THEN the re-exported PSD contains the same bevel/emboss parameters byte-for-byte
-- AND the Broadset document has an `extensions.psd.unmappedEffects` entry with `dirty: false`
+- AND the Broadset project has a PSD interop record with preserved effect fragment and baseline semantic hash
 
 #### Acceptance Criteria
 
 - [ ] Drop shadow, inner shadow, outer glow, inner glow export natively and import to `FilterPrimitive[]`
-- [ ] Colour overlay and gradient overlay export natively and import to `BroadsetFill`
+- [ ] Color overlay and gradient overlay export natively and import to typed appearance fill layers
 - [ ] Stroke layer effect round-trips via native stroke fields on the element
-- [ ] Bevel / satin / pattern overlay ride in `extensions.psd.unmappedEffects` with `dirty: false`
+- [ ] Bevel, satin, and pattern overlay use PSD interop preserved fragments with diagnostics
 - [ ] Untouched unmappedEffects re-export byte-identical
 
 ---
@@ -234,28 +234,28 @@ Vector masks, bitmap (alpha-channel) layer masks, and clipping masks (clip-to-la
 #### Acceptance Criteria
 
 - [ ] Vector masks round-trip with path and boolean operator preserved
-- [x] Bitmap layer masks round-trip — either as a Broadset mask element or via `extensions.psd.bitmapMask` preservation blob when the alpha cannot be represented as a Broadset mask
+- [x] Bitmap layer masks round-trip as typed `appearance.mask` where representable or through a content-addressed PSD interop blob with preview/diagnostic
 - [ ] Clipping masks (clip-to-layer-below) round-trip as parent-child clipping relationships in Broadset
-- [ ] Rounded-rectangle vector masks import to `borderRadius` with rescaled values
+- [ ] Rounded-rectangle vector masks import to typed vector rectangle `cornerRadii` with rescaled values
 
 ---
 
 ### Requirement: Colour Space and ICC Profile Round-Trip
 
-RGB (8-bit), CMYK, Lab, and Grayscale documents MUST round-trip. The exporter emits the colour mode declared by `document.outputIntent.colorSpace`. The importer hydrates `BroadsetColor.originalColor` (IO-D-05) so re-export never silently downgrades a CMYK or Lab colour to sRGB.
+RGB (8-bit), CMYK, Lab, and Grayscale documents MUST round-trip. The exporter follows `document.color.workingSpace` and optional output intent. Import stores authoritative channels in `ColorValue`; exact producer syntax or unmapped channel metadata remains recoverable through interop so re-export never silently downgrades CMYK or Lab to sRGB.
 
 #### Scenario: CMYK round-trip
 
 - GIVEN a CMYK PSD with an embedded U.S. Web Coated SWOP ICC profile
 - WHEN imported and re-exported without edits
 - THEN the re-exported PSD is CMYK with the same embedded ICC profile
-- AND the Broadset document has an `icc-profile` asset referenced by `document.outputIntent.iccProfileAssetId`
+- AND the Broadset document has an ICC asset referenced by `document.color.outputIntent.iccProfileAssetId`
 
 #### Acceptance Criteria
 
 - [ ] RGB / CMYK / Lab / Grayscale round-trip
 - [ ] Embedded ICC profile survives as an `icc-profile` asset on import and re-embeds on export
-- [ ] `BroadsetColor.originalColor` preserves the original colour spec so re-export is lossless
+- [ ] Typed authoritative channels plus producer interop preserve the original color semantics for lossless re-export
 - [ ] Spot colours round-trip via the swatches registry
 - [ ] 16-bit- and 32-bit-per-channel PSDs are imported (downsampled for rendering, original bit depth preserved for re-export) rather than silently flattened to 8-bit
 
@@ -273,19 +273,14 @@ Embedded smart objects (data URI or ZIP-resolved bytes) and linked smart objects
 
 ---
 
-### Requirement: Dirty-Flag Discipline
+### Requirement: Derived PSD Interop Cleanliness
 
-Every imported PSD element MUST land with `extensions.psd.dirty === false`. On re-export:
-
-- Untouched elements (`dirty === false`) re-emit the preserved original layer blob byte-for-byte.
-- Edited elements (`dirty === true`) re-emit from current Broadset state; the preservation blob is discarded.
-
-The dirty flag flips to `true` automatically when the user edits the element in Broadset via the editor middleware (IO-D-11).
+Every preserved PSD mapping MUST create an interop record with source identity, target, baseline semantic hash, and preserved layer blob where applicable. Re-export derives cleanliness from semantic hash equality; no dirty boolean is persisted.
 
 #### Acceptance Criteria
 
-- [ ] Every imported element carries `extensions.psd.dirty === false`
-- [ ] Editing an element in the editor flips the flag to `true` via the dirty-flag middleware
+- [ ] Every preserved mapping has a baseline semantic hash and resolving target
+- [ ] Relevant edits change derived cleanliness; undo restoring baseline semantics restores clean status
 - [ ] Re-exporting an untouched document produces byte-identical output
 - [ ] Editing one element and re-exporting rewrites that element only; every other element is byte-identical
 
@@ -293,21 +288,24 @@ The dirty flag flips to `true` automatically when the user edits the element in 
 
 ### Requirement: Animated Element Static Export
 
-Broadset animations (`animations` array, keyframes) MUST be discarded on PSD export per IO-D-16. Animated elements are exported at their fully-entered "IN" state (all `in` keyframes resolved to their end positions). Animation data is not serialized to XMP — PSD is a static carrier.
+Broadset lifecycle, state machines, and sequences MUST resolve into one `ResolvedSceneSnapshot` at one declared exact static-export tick before PSD export. By default, the exporter derives a single global settled-IN tick: starting from initial machine states at tick 0, it evaluates the document IN lifecycle action and chooses the latest global completion tick among every finite sequence action it starts, including reachable child clips. It then resolves the whole scene once at that global tick. If the IN action has no finite settled tick, the user MUST supply an explicit valid export tick. Runtime animation data is not serialized to XMP; PSD is a static carrier.
 
 If the same PSD is re-imported into Broadset, the animations are NOT recovered; the user must re-author them. This is a documented known-lossy behaviour.
 
 #### Scenario: Animation discarded at export
 
-- GIVEN an element with an animation timeline that translates it from left to right
+- GIVEN a canonical sequence with a transform track targeting an element and selected by the document IN lifecycle action
 - WHEN PSD export runs
-- THEN the element is rendered at the end of the `in` keyframe sequence (the "IN" state)
+- THEN the whole scene is resolved once at the single global settled-IN tick and the element uses that snapshot's typed transform
 - AND no animation data appears in the exported PSD
 
 #### Acceptance Criteria
 
 - [ ] Animations are discarded on export (not serialized to XMP or `additionalInfo`)
 - [ ] Animated elements render at the fully-entered IN state
+- [ ] Every painted value comes from one immutable scene snapshot resolved at one exact global tick
+- [ ] Undeclared runtime events are not applied; state machines begin in their canonical initial states before the declared lifecycle action is evaluated
+- [ ] Given unbounded IN behavior and no explicit valid tick, export fails with an actionable diagnostic
 - [ ] Re-importing a Broadset-exported PSD surfaces an import warning that animations were lost
 
 ---
@@ -317,13 +315,13 @@ If the same PSD is re-imported into Broadset, the animations are NOT recovered; 
 Broadset → PSD → Photoshop → save → re-import MUST preserve:
 
 - **Photoshop-edited fields** — text changes, position moves, colour changes, path edits made in Photoshop appear in Broadset after re-import.
-- **Broadset semantics not touched by Photoshop** — animations (via XMP), data bindings, page override maps, repeater configs, `visibleWhen` expressions (via XMP + `additionalInfo`).
-- **Untouched elements** — byte-identical via the `dirty: false` preservation blob.
+- **Broadset semantics not touched by Photoshop** — stable bindings, page instances/overrides, typed repeaters, and expression ASTs through canonical metadata/interoperability records.
+- **Baseline-equal elements** — byte-identical via the interop preserved blob.
 
 #### Acceptance Criteria
 
 - [ ] A Broadset-edited-then-Photoshop-saved PSD re-imports cleanly
-- [ ] Fields Photoshop edited appear in Broadset with the new values and `dirty: true`
+- [ ] Fields Photoshop edited appear in Broadset and make the current semantic hash differ from baseline
 - [ ] Fields Photoshop did not touch keep their Broadset-native state (animations, bindings, overrides)
 - [ ] Elements Photoshop stripped the `BsPs` signature from recover identity via `fingerprintElement()` matching
 
@@ -363,7 +361,7 @@ Covered sources (see the PSD matrix in [real-producer compatibility](../../imple
 #### Acceptance Criteria
 
 - [ ] Import never throws on valid PSDs from any supported source tool
-- [ ] Unknown layer types, adjustment layers, layer comps, guides, and slices are preserved in `extensions.psd.*` with an import warning describing what was not natively mapped
+- [ ] Unknown layer types, adjustment layers, layer comps, guides, and slices use typed PSD interop preserved blobs or safe foreign fallback with diagnostics
 - [ ] Non-RGB documents from any source import without silent colour conversion
 
 ---
@@ -396,21 +394,21 @@ The core P5.2a foundation and P5.3a/b/c coverage shipped, plus the parity-with-P
 > real third-party fixture corpus = CFIO.5.3 (licensed fixture mounts via
 > W3-QE-01; corpus manifest under W3-CORPUS-01).
 
-- **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Current behaviour: drop shadow, outer glow, inner shadow, stroke-effect emit natively. Target behaviour: CSS-mappable effects (inner glow, solid color overlay from explicit Broadset intent, gradient overlay) emit natively; PSD-only effects (bevel / emboss, satin, pattern overlay) ride in `extensions.psd.unmappedEffects` with `dirty: false` so untouched re-export is byte-identical.
-- **CMYK / Lab / Grayscale + ICC profile round-trip.** Current behaviour: RGB 8-bit only on the current exporter path; preflight surfaces a warning when `document.outputIntent.colorSpace` is non-RGB. Target behaviour: colour mode follows `document.outputIntent.colorSpace`; embedded ICC profile rides via the asset pipeline (`IccProfileAsset` from P4.4 is ready).
+- **Inner glow / color overlay / gradient overlay / bevel / satin / pattern overlay.** Effects in the closed canonical union emit natively; PSD-only effects use interop preserved fragments with baseline hashes so baseline-equal re-export remains byte-identical.
+- **CMYK / Lab / Grayscale + ICC profile round-trip.** Current exporter behavior is RGB 8-bit only; preflight warns when the document working space is non-RGB. Target behavior follows `document.color.workingSpace` and embeds the optional output-intent ICC asset.
 - **16-bit / 32-bit-per-channel import preservation.** Current behaviour: bit depth is always 8. Target behaviour: import preserves original depth for re-export (downsampled for rendering).
 - **Real third-party fixture corpus.** Current behaviour: programmatically-generated `producer-quirks.fixture.ts` exercises the importer + validator on seven synthetic shapes; the `__fixtures__/external/` directory is the local-extension contract for users who drop in real Photoshop / Affinity / GIMP / Krita / Figma exports. Target behaviour: a vendored corpus comparable to veraPDF's once an analogous open-source PSD test corpus exists.
-- **External linked smart-object path preservation.** Current behaviour: Broadset-authored data URI images and prefetched URL images export as embedded PSD `liFD` smart-object byte records, but imported external linked smart objects without embedded bytes do not yet preserve their `linkedFile` path descriptor / file-size metadata for re-export. Target behaviour: when a third-party PSD carries an external linked smart object, import stores the external reference and GUID in `extensions.psd.smartObject`, re-export emits a standards-compliant `liFE` descriptor when `linkSmartObjects !== false`, and surfaces a warning when `linkSmartObjects: false` is requested but the original bytes are unavailable for embedding.
+- **External linked smart-object path preservation.** Current behavior embeds resolving image assets as PSD `liFD` records but does not fully retain third-party external-link descriptors. Target behavior stores external reference/GUID source data in a PSD interop record, emits a standards-compliant `liFE` descriptor when linking is requested, and warns when embedding is requested without source bytes.
 - **XMP packet ↔ layer reconciliation id-based pairing.** Current behaviour: count mismatches warn instead of silently dropping trailing entries, but element identity is still paired by layer-tree order on import because **export does not yet write per-layer `BsPs` `additionalInfo` tags** (document XMP is the primary round-trip carrier today). Target behaviour: export writes `BsPs` on every element-carrying layer and reconcile pairs by stable element id.
 
 _Closed in the 2026-06-21 import/export hardening pass:_
 
-- **Importer caps wired.** `importPsdDocument(data, options)` now accepts `PsdImportOptions`, enforces a default byte cap before ag-psd parsing, and threads depth / total-pixel budgets into `importPsdWithBudget`. Verified by [`import-resource-caps.test.ts`](../../../packages/formats/src/psd/import-resource-caps.test.ts).
-- **Unmapped-layer placeholder warnings.** Layers that can only be represented as generic placeholder rectangles now emit an import warning naming the source layer, satisfying IO-D-18 no-silent-drop behavior. Verified by [`import-resource-caps.test.ts`](../../../packages/formats/src/psd/import-resource-caps.test.ts).
-- **XMP/layer count mismatch warning.** When a PSD's Broadset XMP packet declares a different number of elements than the parsed layer tree yields, import emits a warning with both counts. Verified by [`import-xmp-roundtrip.test.ts`](../../../packages/formats/src/psd/import-xmp-roundtrip.test.ts).
-- **ag-psd parser error detail.** Malformed PSD-looking bytes still return a safe empty document, but the warning now includes ag-psd's parser message for support triage. Verified by [`import-document.test.ts`](../../../packages/formats/src/psd/import-document.test.ts).
-- **Async URL-image fetch budget.** Async PSD export routes URL image fetches through `safeFetchBytes`, exposes `imageFetchTimeoutMs`, `maxImageBytes`, and `allowedImageHosts` on `PsdExportOptions`, and surfaces over-cap failures in `exportPsdBytesAsyncWithPreflight` warnings. Verified by [`preflight.test.ts`](../../../packages/formats/src/psd/preflight.test.ts).
-- **Embedded smart-object option warning removed.** `linkSmartObjects: false` no longer emits a stale warning for Broadset-authored image smart objects, and the exported PSD contains embedded `liFD` bytes with no external `linkedFile` descriptor. Verified by [`export-options.test.ts`](../../../packages/formats/src/psd/export-options.test.ts).
+- **Importer caps wired.** Native v1 import enforces byte, depth, and total-pixel budgets before or during ag-psd parsing. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **Unmapped-layer placeholder warnings.** Layers that can only be represented as generic placeholders emit an interop diagnostic naming the source layer, satisfying IO-D-18 no-silent-drop behavior. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **XMP/layer mismatch preservation.** Native v1 import records producer-only state in the interop registry instead of relying on the retired XMP reconciliation path. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **ag-psd parser error detail.** Malformed PSD-looking bytes return a schema- and semantically-valid fallback project with an importer diagnostic. Verified by [`v1/import.test.ts`](../../../packages/formats/src/psd/v1/import.test.ts).
+- **Self-contained image resolution.** Native v1 export consumes project blobs or the caller-provided resolver and diagnoses unavailable image data without fetching implicitly. Verified by [`v1/export.test.ts`](../../../packages/formats/src/psd/v1/export.test.ts).
+- **Smart-object fallback.** Native v1 export emits linked-file descriptors when source bytes are available and reports diagnosed fallbacks otherwise. Verified by [`v1/export.test.ts`](../../../packages/formats/src/psd/v1/export.test.ts).
 
 _The following items are intentionally scoped out of the PSD track and tracked by other specs:_
 
@@ -424,7 +422,7 @@ _The following items are intentionally scoped out of the PSD track and tracked b
 - **Photoshop actions / history states** — not exported, not imported.
 - **3D layers** — not supported (out of scope for Broadset's 2D canvas model).
 - **Video layers inside PSD** — Broadset uses its own `video` element type; inline PSD video frames are not round-tripped.
-- **Animation frames** — Broadset uses its own animation system (`animations` array); Photoshop timeline / frame animations are not mapped.
+- **Animation frames** — Broadset uses canonical sequences/state machines; Photoshop timeline/frame animations are not mapped.
 - **Scripting events / ExtendScript** — no executable content is emitted or interpreted.
 - **Print output intents beyond ICC profile round-trip** — separation plates, trapping, and imposition are out of scope.
 - **PDF generation** — see [pdf.md](pdf.md).

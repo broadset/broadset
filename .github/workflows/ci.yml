@@ -17,11 +17,13 @@ jobs:
           fetch-depth: 0
 
       - name: gitleaks (secret scan)
+        env:
+          GITLEAKS_LOG_OPTS: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || format('{0}..{1}', github.event.before, github.sha) }}
         run: |
           docker run --rm \
             -v "$PWD:/repo" \
             ghcr.io/gitleaks/gitleaks:latest \
-            detect --source=/repo --redact --verbose
+            detect --source=/repo --redact --verbose --log-opts="$GITLEAKS_LOG_OPTS"
 
       - name: actionlint (workflow lint)
         uses: raven-actions/actionlint@v2

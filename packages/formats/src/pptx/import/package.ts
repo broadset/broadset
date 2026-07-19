@@ -1,10 +1,10 @@
-import type { Canvas } from '@broadset/model';
-
 import { findChild, getAttr, parseOoxml, rootElement } from '../ooxml/ast';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { parseRelationshipsXml } from '../ooxml/relationships';
 import { emuToMm } from '../ooxml/units';
 import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
+import type { PptxSourceCanvas } from '../project-model';
+import type { PptxImportOptions } from '../types';
 
 /**
  * Package-level resolution — given an OoxmlPackage, find the slide
@@ -18,13 +18,13 @@ import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
 interface ResolvedPackage {
   readonly slidePaths: readonly string[];
   readonly slideRelsByPath: ReadonlyMap<string, string>;
-  readonly canvas: Canvas;
+  readonly canvas: PptxSourceCanvas;
   readonly themePath: string | null;
   readonly masterPath: string | null;
   readonly layoutPaths: readonly string[];
 }
 
-const DEFAULT_CANVAS: Canvas = {
+const DEFAULT_CANVAS: PptxSourceCanvas = {
   width: 254, // 10 inches in mm
   height: 190.5, // 7.5 inches in mm
   unit: 'mm',
@@ -33,10 +33,10 @@ const DEFAULT_CANVAS: Canvas = {
   backgroundMode: 'solid',
 };
 
-export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
+export function resolvePackage(pkg: OoxmlPackage, authoredSurface?: PptxImportOptions['authoredSurface']): ResolvedPackage {
   const presXml = readTextPart(pkg, 'ppt/presentation.xml') ?? '';
   const presRelsXml = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels') ?? '';
-  const canvas = parseCanvasFromPresentation(presXml);
+  const canvas = parsePptxSourceCanvasFromPresentation(presXml, authoredSurface);
   const presRels = parseRelationshipsXml(presRelsXml);
 
   const slidePaths: string[] = [];
@@ -83,7 +83,10 @@ export function resolvePackage(pkg: OoxmlPackage): ResolvedPackage {
   return { slidePaths, slideRelsByPath, canvas, themePath, masterPath, layoutPaths };
 }
 
-function parseCanvasFromPresentation(xml: string): Canvas {
+function parsePptxSourceCanvasFromPresentation(
+  xml: string,
+  authoredSurface?: PptxImportOptions['authoredSurface'],
+): PptxSourceCanvas {
   const root = rootElement(parseOoxml(xml));
 
   if (root === null) return DEFAULT_CANVAS;
@@ -97,11 +100,22 @@ function parseCanvasFromPresentation(xml: string): Canvas {
 
   if (cx <= 0 || cy <= 0) return DEFAULT_CANVAS;
 
+  const dpi = authoredSurface?.dpi ?? 72;
+  const unit = authoredSurface?.unit ?? 'mm';
+  const widthMm = emuToMm(cx);
+  const heightMm = emuToMm(cy);
+  const unitLength = (millimetres: number): number => {
+    if (unit === 'in') return millimetres / 25.4;
+    if (unit === 'px') return (millimetres / 25.4) * dpi;
+
+    return millimetres;
+  };
+
   return {
-    width: emuToMm(cx),
-    height: emuToMm(cy),
-    unit: 'mm',
-    dpi: 72,
+    width: unitLength(widthMm),
+    height: unitLength(heightMm),
+    unit,
+    dpi,
     padding: [0, 0, 0, 0],
     backgroundMode: 'solid',
   };

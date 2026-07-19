@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertReImportableBy, runChainRoundTrip } from './index';
+import { assertReImportableBy } from './index';
 
 /**
  * Phase 6 I6.2 — the shared test infrastructure ships its own unit
@@ -53,25 +53,5 @@ describe('assertReImportableBy', () => {
     const nullReader = (): unknown => null;
 
     expect(() => assertReImportableBy(new Uint8Array([1]), nullReader, { formatLabel: 'fmt' })).toThrow(/null/);
-  });
-});
-
-describe('runChainRoundTrip', () => {
-  /**
-   * @description The helper wires source → export → import and hands
-   * back all three artefacts so tests can assert on the imported doc
-   * alongside the source and the raw bytes.
-   */
-  it('returns source, bytes, and imported doc', () => {
-    const source = { elements: [{ id: 'a' }] } as unknown as Parameters<typeof runChainRoundTrip>[0]['source'];
-    const result = runChainRoundTrip({
-      source,
-      exportBytes: () => new Uint8Array([1, 2, 3]),
-      importDocument: () => source,
-    });
-
-    expect(result.source).toBe(source);
-    expect(result.exportedBytes.byteLength).toBe(3);
-    expect(result.imported).toBe(source);
   });
 });

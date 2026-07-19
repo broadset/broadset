@@ -1,8 +1,30 @@
 import { expect, test } from '@playwright/experimental-ct-react';
+import type { Page } from '@playwright/test';
 
 import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS } from '../fixture-selectors';
-import { getHandleCenter, rotateSelectedElement } from './helpers';
+import { getHandleCenter, getWidgetRotation, rotateSelectedElement } from './helpers';
+
+async function readSelectedWestAnchor(page: Page): Promise<{ readonly x: number; readonly y: number }> {
+  return page.evaluate(() => {
+    const state = window.__broadsetProjectEditorStore?.getState();
+    const selectedId = state?.activeInstanceAddresses[0]?.elementId;
+    const element = state?.project.documents[0]?.elements.find(({ id }) => id === selectedId);
+
+    if (element?.geometry.transform.kind !== 'affine2d') {
+      throw new Error('Expected an affine selected element');
+    }
+
+    const [a, b, c, d, e, f] = element.geometry.transform.matrix;
+    const [originX, originY] = element.geometry.origin;
+    const localY = element.geometry.bounds.height / 2;
+
+    return {
+      x: originX + a * -originX + c * (localY - originY) + e,
+      y: originY + b * -originX + d * (localY - originY) + f,
+    };
+  });
+}
 
 /**
  * @description After rotating an element, the widget's CSS `rotate()` changes
@@ -80,9 +102,7 @@ test('resize works correctly after rotating the element (rotate → resize SE)',
   expect(postHeight.endsWith('px')).toBe(true);
 
   // Rotation should be preserved (not reset to 0)
-  const finalTransform = await widget.evaluate((el) => el.style.transform);
-
-  expect(finalTransform).toBe(`rotate(${String(rotationDeg)}deg)`);
+  expect(await getWidgetRotation(page)).toBeCloseTo(rotationDeg, 4);
 });
 
 /**
@@ -107,7 +127,7 @@ test('after rotation, east-handle drag along local X changes width only and keep
 
   const preWidth = parseFloat(await widget.evaluate((element) => element.style.width));
   const preHeight = parseFloat(await widget.evaluate((element) => element.style.height));
-  const westBefore = await getHandleCenter(page, 'w');
+  const westBefore = await readSelectedWestAnchor(page);
   const eastStart = await getHandleCenter(page, 'e');
 
   const localXDrag = 90;
@@ -121,7 +141,7 @@ test('after rotation, east-handle drag along local X changes width only and keep
 
   const postWidth = parseFloat(await widget.evaluate((element) => element.style.width));
   const postHeight = parseFloat(await widget.evaluate((element) => element.style.height));
-  const westAfter = await getHandleCenter(page, 'w');
+  const westAfter = await readSelectedWestAnchor(page);
 
   expect(postWidth).toBeGreaterThanOrEqual(preWidth);
   expect(Math.abs(postHeight - preHeight)).toBeLessThan(2);
@@ -147,7 +167,7 @@ test('collapsing a rotated element to minimum size does not slide the opposite e
   const rotationRad = (rotationDeg * Math.PI) / 180;
   const preWidth = parseFloat(await widget.evaluate((element) => element.style.width));
 
-  const westBefore = await getHandleCenter(page, 'w');
+  const westBefore = await readSelectedWestAnchor(page);
   const eastStart = await getHandleCenter(page, 'e');
 
   const collapseDrag = 260;
@@ -160,12 +180,12 @@ test('collapsing a rotated element to minimum size does not slide the opposite e
   await page.mouse.up();
 
   const postWidth = parseFloat(await widget.evaluate((element) => element.style.width));
-  const westAfter = await getHandleCenter(page, 'w');
+  const westAfter = await readSelectedWestAnchor(page);
 
   expect(postWidth).toBeLessThanOrEqual(preWidth);
   expect(postWidth).toBeGreaterThan(0);
-  expect(Math.abs(westAfter.x - westBefore.x)).toBeLessThan(5);
-  expect(Math.abs(westAfter.y - westBefore.y)).toBeLessThan(5);
+  expect(Math.abs(westAfter.x - westBefore.x)).toBeLessThan(0.01);
+  expect(Math.abs(westAfter.y - westBefore.y)).toBeLessThan(0.01);
 });
 
 /**
@@ -218,9 +238,7 @@ test('drag/move works correctly after rotating the element (rotate → drag)', a
   expect(postWidth).toBe(preWidth);
 
   // Rotation should be preserved
-  const finalTransform = await widget.evaluate((el) => el.style.transform);
-
-  expect(finalTransform).toBe(`rotate(${String(rotationDeg)}deg)`);
+  expect(await getWidgetRotation(page)).toBeCloseTo(rotationDeg, 4);
 });
 
 /**
@@ -261,7 +279,7 @@ test('full compound sequence: rotate → resize → drag preserves all transform
   const afterResizeHeight = await widget.evaluate((el) => el.style.height);
 
   // Rotation should still be the same
-  expect(await widget.evaluate((el) => el.style.transform)).toBe(`rotate(${String(rotationDeg)}deg)`);
+  expect(await getWidgetRotation(page)).toBeCloseTo(rotationDeg, 4);
 
   // Step 3: drag the element
   const bounds = page.getByTestId('transform-bounds');
@@ -280,11 +298,10 @@ test('full compound sequence: rotate → resize → drag preserves all transform
   await page.mouse.up();
 
   // After full sequence: rotation preserved, dimensions preserved, position changed
-  const finalTransform = await widget.evaluate((el) => el.style.transform);
   const finalWidth = await widget.evaluate((el) => el.style.width);
   const finalHeight = await widget.evaluate((el) => el.style.height);
 
-  expect(finalTransform).toBe(`rotate(${String(rotationDeg)}deg)`);
+  expect(await getWidgetRotation(page)).toBeCloseTo(rotationDeg, 4);
   expect(finalWidth).toBe(afterResizeWidth);
   expect(finalHeight).toBe(afterResizeHeight);
 });

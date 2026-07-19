@@ -5,8 +5,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { exportPptxBytes } from './export';
-import { buildCanonicalDocument } from './fixtures/canonical';
+import { buildCanonicalPptxV1 } from './fixtures/canonical-v1';
 
 /**
  * @description LibreOffice headless verification — proves a Broadset-
@@ -41,10 +40,6 @@ function findLibreOffice(): string | null {
   return null;
 }
 
-function buildCanonicalFixture(): Uint8Array {
-  return exportPptxBytes(buildCanonicalDocument());
-}
-
 const lo = findLibreOffice();
 
 describe('LibreOffice headless verification', () => {
@@ -64,8 +59,8 @@ describe('LibreOffice headless verification', () => {
     return;
   }
 
-  it(`canonical Broadset PPTX converts to a non-trivial PDF (${lo})`, () => {
-    const bytes = buildCanonicalFixture();
+  it(`canonical Broadset PPTX converts to a non-trivial PDF (${lo})`, async () => {
+    const bytes = await buildCanonicalPptxV1();
     const dir = mkdtempSync(join(tmpdir(), 'broadset-libreoffice-'));
     const pptxPath = join(dir, 'canonical.pptx');
 

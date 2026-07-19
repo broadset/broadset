@@ -2,255 +2,133 @@
 
 ## Purpose
 
-Defines the structural rules and invariants for `BroadsetProject` — the top-level container of the Broadset format. A project bundles shared settings, a centralized asset library, and one or more documents (templates/graphics). All consumers (validators, serializers, editors, renderers, playout systems) MUST preserve every requirement in this spec.
-
----
+Defines the canonical `BroadsetProjectV1` authoring root, its identity, ownership boundaries, shared resources, document collection, template relationships, interoperability records, and extension envelopes.
 
 ## Requirements
 
-### Requirement: Schema Version
+### Requirement: Canonical v1 Project Identity
 
-Every project MUST carry a `schemaVersion` field with a positive integer value. The initial schema version is `1`. Consumers MUST reject projects with an unrecognized schema version.
+Every canonical project MUST contain `$schema`, `format`, and `schemaVersion` with these exact values:
 
-#### Scenario: Valid schema version
+- `$schema: 'https://schema.broadset.dev/v1/project.schema.json'`
+- `format: 'broadset-project'`
+- `schemaVersion: 1`
 
-- GIVEN a project with `schemaVersion: 1`
-- WHEN the project is validated
-- THEN validation succeeds
-
-#### Scenario: Missing schema version rejected
-
-- GIVEN a project without a `schemaVersion` field
-- WHEN the project is validated
-- THEN validation fails
-
-#### Scenario: Unknown schema version rejected
-
-- GIVEN a project with `schemaVersion: 999`
-- WHEN a consumer attempts to load it
-- THEN the consumer rejects it with a clear version-mismatch error
+Consumers MUST reject every other schema version with a typed unsupported-version diagnostic. The production v1 loader MUST NOT migrate or accept pre-v1 Broadset-owned project shapes.
 
 #### Acceptance Criteria
 
-- [ ] Given a project with `schemaVersion: 1`, validation succeeds
-- [ ] Given a project without `schemaVersion`, validation fails
-- [ ] Given an unknown schema version, the consumer rejects with a version-mismatch error
+- [ ] Given all three exact identity values, structural validation proceeds
+- [ ] Given a missing or different identity value, validation fails at that field
+- [ ] Given `schemaVersion: 2`, loading returns `unsupported-version` and preserves the source bytes
 
----
+### Requirement: Canonical Root Vocabulary
 
-### Requirement: Project Identity and Metadata
+A project MUST contain exactly these core fields: `$schema`, `format`, `schemaVersion`, `id`, `metadata`, `resources`, `documents`, `templateGroups`, `interop`, and `extensions`. Core objects are strict; unknown root fields are validation errors.
 
-Every project MUST have a non-empty `id`, a `name` string, and ISO 8601 timestamps `createdAt` and `updatedAt`.
-
-#### Scenario: Valid project metadata
-
-- GIVEN a project with `id: 'proj-001'`, `name: 'Sports Show'`, `createdAt: '2026-04-05T12:00:00Z'`, `updatedAt: '2026-04-05T12:00:00Z'`
-- WHEN the project is validated
-- THEN validation succeeds
-
-#### Scenario: Empty ID rejected
-
-- GIVEN a project with `id: ''`
-- WHEN the project is validated
-- THEN validation fails
+`id` MUST be a stable, non-empty Unicode string without control characters. UUIDs are the default generated form, but deterministic import identifiers MAY use another valid shape.
 
 #### Acceptance Criteria
 
-- [ ] Given a project with valid id, name, and ISO 8601 timestamps, validation succeeds
-- [ ] Given a project with an empty id, validation fails
-- [ ] Given a project with non-ISO-8601 timestamps, validation fails
+- [ ] Given a project containing every required root field and no unknown field, structural validation succeeds
+- [ ] Given an unknown root field, structural validation fails at that field
+- [ ] Given an empty or control-character project ID, validation fails
 
----
+### Requirement: Project Metadata
 
-### Requirement: Project Settings
+`metadata` MUST contain `name`, UTC `createdAt`, and UTC `updatedAt`. It MAY contain `description`, `authors`, `keywords`, `rights`, and generator `name`, `version`, and optional `build`.
 
-Every project MUST have a `settings` object containing:
-
-- `fonts`: array of `FontDefinition` (may be empty — empty triggers fallback system fonts)
-- `palette`: array of CSS color strings (brand colors, may be empty)
-- `defaultDocumentMode`: `'screen'` or `'print'`
-
-#### Scenario: Valid settings
-
-- GIVEN settings with `fonts: [{ family: 'Arial', variants: [{ weight: 400, style: 'normal' }], source: { kind: 'system' } }]`, `palette: ['#ff0000']`, `defaultDocumentMode: 'screen'`
-- WHEN the project is validated
-- THEN validation succeeds
-
-#### Scenario: Empty fonts triggers fallback
-
-- GIVEN settings with `fonts: []`
-- WHEN fonts are resolved
-- THEN fallback system fonts are used (Arial, Courier New, Times New Roman, Georgia)
+`updatedAt` MUST NOT precede `createdAt`. Package-creation and local-save timestamps are package or persistence metadata, not semantic project metadata.
 
 #### Acceptance Criteria
 
-- [ ] Given valid settings with fonts, palette, and defaultDocumentMode, validation succeeds
-- [ ] Given empty fonts array, fallback system fonts are used
-- [ ] Given invalid defaultDocumentMode, validation fails
+- [ ] Given timezone-qualified UTC timestamps where `updatedAt` is not earlier than `createdAt`, validation succeeds
+- [ ] Given a local or timezone-free timestamp, validation fails at that timestamp
+- [ ] Given `updatedAt` earlier than `createdAt`, semantic validation fails
 
----
+Document metadata, when present, is a separate strict
+`{description?,authors,keywords,rights?}` record. Its author and keyword arrays are explicit, may be
+empty, and contain only non-empty strings. It does not duplicate project timestamps or persist
+locale or UI state.
 
-### Requirement: Font Definition Structure
+- [ ] Given document metadata with explicit empty author and keyword arrays, structural validation succeeds without inserting defaults
+- [ ] Given document metadata containing timestamps, locale, or UI state, structural validation fails
 
-Each `FontDefinition` MUST have:
+### Requirement: Project Resources
 
-- `family`: non-empty string
-- `variants`: array of `FontVariant` (each with `weight: 100–900` and `style: 'normal' | 'italic'`)
-- `source` (optional): `{ kind: 'system' }`, `{ kind: 'url', url: string }`, or `{ kind: 'assetId', assetId: string }`
-
-#### Scenario: System font
-
-- GIVEN a font with `family: 'Arial'`, `variants: [{ weight: 400, style: 'normal' }]`, `source: { kind: 'system' }`
-- WHEN the font is validated
-- THEN validation succeeds
-
-#### Scenario: Asset-referenced font
-
-- GIVEN a font with `source: { kind: 'assetId', assetId: 'font-001' }`
-- WHEN the font is validated
-- THEN the assetId MUST reference a valid asset with `kind: 'font'`
+`resources` MUST contain ordered arrays named `assets`, `fonts`, `swatches`, `variables`, `styles`, and `outputProfiles`. Resource IDs MUST be stable and unique in their respective project scopes. Documents and component definitions reference these project-owned resources by ID.
 
 #### Acceptance Criteria
 
-- [ ] Given a system font definition, validation succeeds
-- [ ] Given a URL-sourced font, validation succeeds with a valid URL
-- [ ] Given an asset-referenced font, the assetId must reference a font asset
+- [ ] Given multiple documents referencing one project asset, each reference resolves to the same logical asset
+- [ ] Given duplicate resource IDs in one resource scope, semantic validation fails
+- [ ] Given a resource reference of the wrong kind, semantic validation fails at the reference
 
----
+### Requirement: Project Documents
 
-### Requirement: Non-Empty Documents
+`documents` MUST contain at least one `BroadsetDocumentV1`. Document IDs MUST be unique in the project. The editor store owns the complete project; active document and page selections are runtime UI state.
 
-A project MUST contain at least one document. An empty `documents` array is invalid.
-
-#### Scenario: Project with one document
-
-- GIVEN a project with `documents: [{ ... }]`
-- WHEN the project is validated
-- THEN validation succeeds
-
-#### Scenario: Empty documents rejected
-
-- GIVEN a project with `documents: []`
-- WHEN the project is validated
-- THEN validation fails
+Main save and export operations MUST serialize the whole project. A document-only interchange operation MUST use a distinct command, label, and schema and MUST NOT be presented as a full project save.
 
 #### Acceptance Criteria
 
-- [ ] Given a project with at least one document, validation succeeds
-- [ ] Given a project with empty documents array, validation fails
+- [ ] Given one or more uniquely identified documents, project validation proceeds
+- [ ] Given no documents or duplicate document IDs, validation fails
+- [ ] Given a full project save, every document and project resource is serialized
 
----
+### Requirement: Template Groups
 
-### Requirement: Format Identity
+`templateGroups` relates independently authored document variants without changing their render semantics. Each group MUST have a stable unique `id`, `name`, and ordered `members`. Each member MUST have a stable ID, a resolving `documentId`, an aspect-ratio or named role, optional label, and resolving `outputProfileIds`.
 
-The Broadset format uses:
-
-- File extension: `.bsp` (Broadset Project)
-- MIME type: `application/vnd.broadset.project+json`
-- JSON Schema URL: `https://schema.broadset.dev/v1/project.json`
-
-A project MAY include a `$schema` field referencing the JSON Schema URL for cross-platform validation.
-
-Packaged projects (with embedded assets) use a ZIP container with the same `.bsp` extension:
-
-```
-my-show.bsp (ZIP)
-├── project.json          ← BroadsetProject JSON
-├── assets/               ← embedded asset files
-│   ├── logo.png
-│   └── font-bold.woff2
-└── thumbnails/           ← optional preview images
-    └── doc-scorebug.png
-```
-
-Detection: ZIP files start with `PK` magic bytes; plain JSON starts with `{`.
+Aspect ratios MUST contain positive safe integers reduced to lowest terms. Member IDs MUST be unique within a group. A document MAY belong to multiple groups.
 
 #### Acceptance Criteria
 
-- [ ] Given a `.bsp` file containing valid JSON, it is parsed as a BroadsetProject
-- [ ] Given a `.bsp` file that is a ZIP container, `project.json` inside it is parsed as a BroadsetProject
-- [ ] Given a project with `$schema` set, the field is preserved on round-trip
+- [ ] Given a group linking horizontal and vertical document variants, both remain independently authored documents
+- [ ] Given a missing document or output-profile reference, semantic validation fails
+- [ ] Given a non-reduced, zero, or negative aspect ratio, validation fails
 
----
+### Requirement: Interoperability Registry
 
-### Requirement: Template Groups (Multi-Format)
-
-A project MAY contain a `templateGroups` array at the project level. Each `TemplateGroup` links related documents that represent the same graphic adapted for different output formats (e.g., 16:9 HD, 9:16 vertical for social media, 1:1 square for Instagram).
-
-A `TemplateGroup` MUST contain:
-
-- `groupId`: non-empty string, unique within the project
-- `name`: human-readable group name
-- `members`: array of `TemplateGroupMember`, at least 1 member
-
-A `TemplateGroupMember` MUST contain:
-
-- `documentId`: references a document in the project's `documents` array
-- `role`: `'16:9'` | `'9:16'` | `'1:1'` | `'4:3'` | `'custom'` — the aspect ratio / format role
-- `label` (optional): human-readable label (e.g., `'Social Vertical'`, `'HD Primary'`)
-
-Template groups are metadata — they do NOT affect document behavior, rendering, or validation. They exist to help editors and playout systems present related variants together. A document MAY appear in multiple template groups. A document MAY appear in zero template groups.
-
-#### Scenario: HD and vertical variants linked
-
-- GIVEN a project with two documents: `doc-hd` (1920×1080) and `doc-vertical` (1080×1920)
-- AND a template group `{ groupId: 'tg-scorebug', name: 'Scorebug', members: [{ documentId: 'doc-hd', role: '16:9' }, { documentId: 'doc-vertical', role: '9:16' }] }`
-- WHEN the project is validated
-- THEN validation succeeds and both documents are linked in the group
-
-#### Scenario: Template group with custom role
-
-- GIVEN a member with `role: 'custom'` and `label: 'Ultra-wide Banner'`
-- WHEN the template group is validated
-- THEN validation succeeds
-
-#### Scenario: Member references non-existent document
-
-- GIVEN a template group member with `documentId: 'doc-missing'`
-- AND no document with that ID exists in the project
-- WHEN the project is validated
-- THEN validation fails
-
-#### Scenario: Empty template groups array is valid
-
-- GIVEN a project with `templateGroups: []`
-- WHEN the project is validated
-- THEN validation succeeds (template groups are optional)
+`interop` MUST contain ordered `sources` and `records` arrays. Broadset-owned source preservation and external identity data MUST live in this registry rather than generic extensions. Interop IDs MUST be unique in their respective scopes and every record source and target MUST resolve.
 
 #### Acceptance Criteria
 
-- [ ] Given a valid template group with members referencing existing documents, validation succeeds
-- [ ] Given a member referencing a non-existent document, validation fails
-- [ ] Given duplicate groupId values, validation fails
-- [ ] Given an empty templateGroups array, validation succeeds
-- [ ] Given a document appearing in multiple template groups, validation succeeds
-- [ ] Given a template group with role 'custom', validation succeeds
-- [ ] Given templateGroups on round-trip serialization, all data is preserved
+- [ ] Given valid source and target references, an interop record is accepted
+- [ ] Given a missing interop source or target, semantic validation fails
+- [ ] Given format-specific Broadset round-trip data in an extension envelope, validation reports the incorrect ownership domain
 
----
+### Requirement: Generic Extensions
 
-### Requirement: Extension Points
-
-Every major type (`BroadsetProject`, `BroadsetDocument`, `BroadsetElement`, `Page`) MAY carry an `extensions` field: a record of string keys to unknown JSON values.
-
-- Keys SHOULD use reverse-domain namespacing (e.g., `'tv.vizrt'`, `'io.caspar'`)
-- Parsers MUST preserve unrecognized extensions on round-trip
-- Parsers MUST NOT fail on unknown extensions
-- Extension values MUST be valid JSON (no functions, no undefined)
-
-#### Scenario: Unknown extensions preserved
-
-- GIVEN a project with `extensions: { 'com.example': { foo: 42 } }`
-- WHEN the project is serialized and re-parsed
-- THEN `extensions['com.example'].foo` is `42`
+`extensions` MUST be an ordered array of envelopes containing `namespace`, `schema`, `version`, and inert JSON `payload`. `namespace` MUST be a lowercase reverse-DNS-style name containing at least two dot-separated labels; each label starts and ends with an ASCII lowercase letter or digit and MAY contain interior ASCII hyphens. `schema` MUST be an absolute HTTPS URL. `version` MUST be a positive JSON-safe integer. Namespaces MUST be unique within their owning entity. Core parsing validates the envelope without requiring a plugin and preserves unknown valid payloads with semantic JSON equality. Malformed envelope identity is structurally invalid and is not preserved as though it were a valid extension.
 
 #### Acceptance Criteria
 
-- [ ] Given a project with extension data, the extensions survive JSON round-trip
-- [ ] Given unrecognized extension keys, the parser does not fail
+- [ ] Given an unknown well-formed envelope, parse and serialization preserve its payload
+- [ ] Given a lowercase dotted reverse-DNS namespace, absolute HTTPS schema URL, and positive safe-integer version, structural validation succeeds
+- [ ] Given an uppercase, undotted, empty-label, or edge-hyphen namespace, structural validation fails
+- [ ] Given a relative or non-HTTPS schema URL, structural validation fails
+- [ ] Given a zero, negative, fractional, or unsafe version, structural validation fails
+- [ ] Given duplicate namespaces on one owner, semantic validation fails
+- [ ] Given executable behavior encoded in a payload, core parsing leaves it inert
 
----
+### Requirement: Canonical Ownership Boundary
+
+The canonical project MUST exclude editor selection, viewport, open panels, active tools, playback state, undo, journals, presence, CRDT metadata, caches, shaped glyphs, thumbnails, runtime indexes, and render plans.
+
+#### Acceptance Criteria
+
+- [ ] Given a canonical save, no runtime UI, collaboration, or derived-render state is serialized
+- [ ] Given a persistence journal, it can reference project IDs and content hashes without becoming a project field
+- [ ] Given repeated parse and serialization, semantic project content remains stable
 
 ## Spec Gaps
 
-- [ ] **Proposed canonical package/interchange split:** ADR-008 proposes making checksummed ZIP the only canonical `.bsp` representation and moving raw JSON to a separate extension/MIME type. The current plain-JSON-or-ZIP `.bsp` contract and `application/vnd.broadset.project+json` MIME remain authoritative until explicit maintainer ratification, migration policy, codec limits, and compatibility tests are approved.
+- Package codec budgets, atomic persistence adapters, and collaboration transports are specified here only at their model boundary and require their owning implementation programs.
+
+## Non-Goals
+
+- Backward compatibility with pre-v1 Broadset-owned draft shapes
+- Runtime navigation or editor-state persistence
+- Document-only interchange schema details
+- Plugin execution or plugin payload semantics

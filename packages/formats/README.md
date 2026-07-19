@@ -1,21 +1,23 @@
 # @broadset/formats
 
-Import/export adapters for Broadset project and external interchange formats.
+Native Broadset project persistence.
 
 ## Responsibilities
 
-- Export Broadset documents to formats such as SVG, HTML, PDF, PSD, PPTX, raster, and video.
-- Import external files into Broadset documents.
-- Provide shared interchange helpers (filename sanitization, package generation, runtime export helpers).
+- Load checksummed `.bsp` project packages without throwing across the public API.
+- Save self-contained `.bsp` project packages with canonical v1 project JSON and content-addressed blobs.
+- Enforce package size, path, integrity, schema, and semantic validation limits.
 
 ## Usage
 
 ```ts
-import { exportSvg, importPptxDocument } from '@broadset/formats';
+import { exportBspPackageV1, loadBspPackageV1 } from '@broadset/formats';
 
-const svg = exportSvg(document);
+const saved = await exportBspPackageV1({ project, blobs });
+const loaded = saved.status === 'exported' ? await loadBspPackageV1(saved.bytes) : saved;
 ```
 
 ## Notes
 
 - Package boundary: may import `@broadset/model` and `@broadset/playback`.
+- External interchange formats are intentionally outside the production package API until their campaign resumes.

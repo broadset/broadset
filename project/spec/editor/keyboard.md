@@ -136,13 +136,13 @@ Select-all MUST select every element ID on the active page.
 
 ### Requirement: Group and Ungroup Shortcuts
 
-Ctrl+G MUST group all multi-selected elements (assign shared groupId). Ctrl+Shift+G MUST ungroup (clear groupId). Grouping with single selection MUST be a no-op.
+Ctrl+G MUST create a structural group and atomically reparent compatible multi-selected roots. Ctrl+Shift+G MUST reparent a selected group's children and remove the group. Single-selection grouping is a no-op.
 
 #### Scenario: Group multi-selection
 
 - GIVEN elements A and B are selected
 - WHEN Ctrl+G is pressed
-- THEN both elements share a new groupId
+- THEN a new group owns both through `parentId`
 
 #### Scenario: Single selection no-op
 
@@ -154,7 +154,7 @@ Ctrl+G MUST group all multi-selected elements (assign shared groupId). Ctrl+Shif
 
 - GIVEN grouped elements A and B are selected
 - WHEN Ctrl+Shift+G is pressed
-- THEN both elements have `groupId: null`
+- THEN the group is removed and both preserve world geometry under its former parent
 
 #### Acceptance Criteria
 

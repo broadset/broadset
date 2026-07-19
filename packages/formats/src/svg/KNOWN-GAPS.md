@@ -1,9 +1,9 @@
 # SVG track — known gaps
 
 This document tracks the **honest** outstanding gaps in the SVG
-import/export track as of P7.7o. The track is production-grade for
-documented surfaces (5 real-tool fixtures pinning each ecosystem,
-276 tests, security-reviewer audit landed); the items below are
+import/export track. The native v1 path is covered by real producer
+fixtures, schema and semantic validity oracles, round-trip tests, and
+the retained security-hardened parser modules; the items below are
 issues we know about and have explicitly chosen not to close yet.
 
 Update this file when a gap closes (delete the entry) or when a
@@ -19,21 +19,17 @@ fidelity description, and the deferred fix).
 **Severity:** Low (hygiene only — single-concern, low risk)
 **Locations:**
 
-- [`export.ts`](./export.ts) — 855 lines (orchestrator + element renderer)
-- [`export-fonts.ts`](./export-fonts.ts) — 712 lines (font embedding pipeline)
 - [`import-defs.ts`](./import-defs.ts) — 841 lines (gradient/filter/mask/pattern/clipPath builders)
 - [`import-css.ts`](./import-css.ts) — 779 lines (CSS rule + selector resolver)
 
 **Why deferred:** each is internally cohesive (single concern per
 module). Further splitting would mostly move types around without
-reducing real complexity. P7.7m reduced `import.ts` from 3562 → 2
-lines (now a barrel) by extracting 5 focused modules; the remaining
-files are at their natural size.
+reducing real complexity. The retired import/export orchestrators have
+been retired; these parser modules remain behind the native v1 importer.
 
 **Trigger to close:** when adding a substantial new feature to one
 of these files that would push it over 1000 lines, split at the
-natural seam (e.g., `export.ts` could split element rendering from
-the orchestrator).
+natural seam.
 
 ---
 

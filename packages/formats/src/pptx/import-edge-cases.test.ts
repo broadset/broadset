@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { importPptx } from './import';
 import { encodeText, writeOoxmlPackage } from './ooxml/zip';
+import { importPptxSource as importPptx } from './source-import';
 
 const SELF_FILE_PATH = fileURLToPath(import.meta.url);
 

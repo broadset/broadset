@@ -11,6 +11,7 @@ import {
   normalizeRelative,
   stripFencedCode,
 } from './check-documentation-markdown.mjs';
+import { checkPublishedProjectSchema } from './check-project-schema.mjs';
 
 export const ARCHITECTURE_START_MARKER = '<!-- BEGIN GENERATED: MANIFEST BASELINE -->';
 export const ARCHITECTURE_END_MARKER = '<!-- END GENERATED: MANIFEST BASELINE -->';
@@ -457,6 +458,8 @@ export async function checkDocumentation(rootDir) {
   findings.push(...(await checkSourceRemovedDocumentReferences(absoluteRoot)));
   findings.push(...(await checkAdrAuthority(absoluteRoot)));
   findings.push(...(await checkCrossSpecContracts(absoluteRoot)));
+
+  findings.push(...(await checkPublishedProjectSchema(absoluteRoot)));
 
   const architecturePath = path.join(absoluteRoot, 'project/implementation/architecture.md');
   if (await pathExists(architecturePath)) {

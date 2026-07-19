@@ -1,164 +1,80 @@
-# Model — Change Stream Type Contracts
+# Model — Atomic Change Batches
 
 ## Purpose
 
-Defines the discriminated union of document and project mutation events emitted by the change stream. These change types enable collaboration (OT/CRDT), undo/redo, and real-time synchronization between editor instances. This spec defines _what_ changes look like; not how they are emitted or applied (→ `project/spec/editor/collaboration.md`). See [conventions](../../README.md).
-
-**Key structural note:** Elements live on the **document**, not on pages. Pages are override layers. See [spec.md](spec.md) and [format-reference.md](format-reference.md).
-
----
+Defines the model boundary for invertible local mutations used by persistence, undo, recovery, and collaboration without embedding operation history in the canonical project snapshot.
 
 ## Requirements
 
-### Requirement: Change Variant Vocabulary
+### Requirement: Change Batch Envelope
 
-The change stream MUST emit exactly these discriminated variants, each identified by a `type` field:
-
-**Element changes (document-level):**
-
-- `element:add` — a new element was added to a document
-- `element:remove` — an element was removed from a document
-- `element:update` — an element property was modified
-- `element:reorder` — an element was moved within its document's element list
-
-**Animation changes:**
-
-- `animation:update` — an animation definition was modified
-
-**Page changes:**
-
-- `page:add` — a new page (override layer) was added
-- `page:remove` — a page was removed
-- `page:override:update` — a page override was added, modified, or removed
-
-**Document settings:**
-
-- `settings:update` — a document-level setting was modified
-
-**Data schema changes:**
-
-- `dataSchema:update` — the data schema was modified (fields added, removed, or changed)
-
-**Asset changes (project-level):**
-
-- `asset:add` — an asset was added to the project
-- `asset:remove` — an asset was removed from the project
-- `asset:update` — an asset was modified
-
-**Project settings:**
-
-- `project:settings:update` — a project-level setting was modified (fonts, palette)
-
-#### Scenario: All variant types are emitted
-
-- GIVEN an editing session that adds/updates/reorders/removes elements, modifies animations, manages pages and overrides, updates settings, modifies data schema, and manages assets
-- WHEN the change stream is observed
-- THEN each corresponding change type is emitted in order
-
-#### Scenario: Unknown change types are not emitted
-
-- GIVEN any editing operation
-- WHEN the change stream is observed
-- THEN the change type is always one of the defined variants
+A `ChangeBatch` MUST contain `version: 1`, stable `transactionId`, `origin` (`local`, `remote`, `recovery`, or `system`), and a non-empty ordered `operations` array. The whole batch MUST be structurally, semantically, and size validated before application.
 
 #### Acceptance Criteria
 
-- [ ] Given a complete editing workflow, all change variant types can be emitted
-- [ ] Given any editing operation, the emitted change type is always one of the defined variants
+- [ ] Given a valid supported batch, every operation is validated before mutation begins
+- [ ] Given an unsupported batch version or invalid operation, no operation is applied
+- [ ] Given a size-cap violation, the batch is rejected before allocation proportional to its declared payload
 
----
+### Requirement: Stable Targets and Ordered Collections
 
-### Requirement: Change Payload Contracts
-
-Each change variant MUST carry the minimum data needed to apply or invert the mutation:
-
-**Element changes (`documentId` required on all):**
-
-- `element:add` — `documentId`, `elementId`, full `element` data
-- `element:remove` — `documentId`, `elementId`, full `element` data (for undo)
-- `element:update` — `documentId`, `elementId`, dot-separated `path`, `oldValue`, `newValue`
-- `element:reorder` — `documentId`, `elementId`, `fromIndex`, `toIndex`
-
-**Animation changes:**
-
-- `animation:update` — `documentId`, `elementId`, dot-separated `path`, `oldValue`, `newValue`
-
-**Page changes:**
-
-- `page:add` — `documentId`, `pageId`, full `page` data
-- `page:remove` — `documentId`, `pageId`, full `page` data (for undo)
-- `page:override:update` — `documentId`, `pageId`, `elementId`, `field` (which override field changed), `oldValue`, `newValue`
-
-**Data schema changes:**
-
-- `dataSchema:update` — `documentId`, dot-separated `path`, `oldValue`, `newValue`
-
-**Asset changes:**
-
-- `asset:add` — `assetId`, full `asset` data
-- `asset:remove` — `assetId`, full `asset` data (for undo)
-- `asset:update` — `assetId`, dot-separated `path`, `oldValue`, `newValue`
-
-**Settings changes:**
-
-- `settings:update` — `documentId`, dot-separated `path`, `oldValue`, `newValue`
-- `project:settings:update` — dot-separated `path`, `oldValue`, `newValue`
-
-#### Scenario: Element add change carries full element
-
-- GIVEN a new element added to a document
-- WHEN the `element:add` change is emitted
-- THEN it contains `documentId`, the `elementId`, and the complete `element` data
-
-#### Scenario: Element update carries old and new values
-
-- GIVEN an element whose `position.x` changes from `10` to `50`
-- WHEN the `element:update` change is emitted
-- THEN it contains `path: 'position.x'`, `oldValue: 10`, `newValue: 50`
-
-#### Scenario: Element reorder carries from/to indices
-
-- GIVEN an element moved from index 0 to index 2 in its document
-- WHEN the `element:reorder` change is emitted
-- THEN it contains `fromIndex: 0` and `toIndex: 2`
-
-#### Scenario: Element remove carries full element for undo
-
-- GIVEN an element removed from the document
-- WHEN the `element:remove` change is emitted
-- THEN it contains the full element data to support undo/re-add
-
-#### Scenario: Page override update carries field details
-
-- GIVEN a page override where the content of element "el-title" changes from "Hello" to "Goodbye"
-- WHEN the `page:override:update` change is emitted
-- THEN it contains `pageId`, `elementId: 'el-title'`, `field: 'content'`, `oldValue: 'Hello'`, `newValue: 'Goodbye'`
-
-#### Scenario: Asset add change carries full asset
-
-- GIVEN a new asset added to the project
-- WHEN the `asset:add` change is emitted
-- THEN it contains `assetId` and the complete asset data
+Operations MUST address entities by stable identity and properties by RFC 6901 JSON Pointer. Ordered-collection changes MUST use stable identity anchors rather than durable array indexes. Operation order within a batch is deterministic and later operations observe earlier batch results.
 
 #### Acceptance Criteria
 
-- [ ] Given an element add, the change contains documentId, elementId, and full element data
-- [ ] Given an element update, the change contains path, oldValue, and newValue
-- [ ] Given an element reorder, the change contains fromIndex and toIndex
-- [ ] Given an element remove, the change contains full element data for undo support
-- [ ] Given a page override update, the change contains pageId, elementId, field, oldValue, and newValue
-- [ ] Given an asset add, the change contains assetId and full asset data
+- [ ] Given entity reorder after concurrent index changes, stable anchors preserve the intended entity target
+- [ ] Given multiple operations in one batch, they apply sequentially against batch-relative state
+- [ ] Given a missing stable anchor, atomic validation fails
 
----
+### Requirement: Invertibility and Preconditions
+
+Every operation MUST carry enough typed prior and next state to be independently invertible and MUST verify its expected prior value before applying. A failed precondition rejects the entire batch without partial mutation.
+
+#### Acceptance Criteria
+
+- [ ] Given an applied operation, its inverse restores the exact prior canonical state
+- [ ] Given an expected prior value mismatch, the whole batch is rejected
+- [ ] Given a rejected batch, project identity and serialization remain unchanged
+
+### Requirement: Atomic Application
+
+Batch application is all-or-nothing. External and remote batches receive the same validation as local batches. Successful durable acknowledgement requires an atomic persistence journal/head commit; mutation alone is not durable acknowledgement.
+
+#### Acceptance Criteria
+
+- [ ] Given a failure at any operation, none of the batch effects become visible
+- [ ] Given a successful batch but failed persistence commit, durability is not acknowledged
+- [ ] Given a verified atomic commit, recovery can select the complete new head
+
+### Requirement: Snapshot Boundary
+
+Change logs, undo stacks, CRDT metadata, presence, sync cursors, and journals MUST NOT appear inside `project.json`. They MAY reference snapshot semantic hashes and stable project entity IDs in external persistence or collaboration stores.
+
+#### Acceptance Criteria
+
+- [ ] Given a project save after many edits, no operation log or undo entry is serialized
+- [ ] Given collaboration metadata, removing it does not alter project semantics
+- [ ] Given a persistence journal, it can materialize the same validated project snapshot
+
+### Requirement: Recovery
+
+The previous valid snapshot MUST remain recoverable until a replacement package or journal head is fully verified and atomically committed. Recovery-origin batches still require full validation and explicit diagnostics.
+
+#### Acceptance Criteria
+
+- [ ] Given interruption before head commit, reopening returns the prior valid snapshot
+- [ ] Given a corrupt candidate head, recovery preserves it for diagnosis and uses the last verified snapshot when available
+- [ ] Given a recovery batch, its origin is retained outside canonical project semantics
 
 ## Spec Gaps
 
 - [ ] **Proposed complete atomic/stable-anchor vocabulary:** ADR-011 proposes versioned batches, stable anchors, JSON Pointer paths, project/document/component lifecycle coverage, and independently invertible operations. Current discriminants, dot paths, and index-based reorder payloads remain authoritative until a maintainer ratifies a replacement and defines deterministic multi-reorder batch semantics, migration, and exhaustive round-trip tests.
+- The complete operation union, journal storage adapters, conflict protocol, and CRDT mapping are owned by the persistence and collaboration programs.
 
 ---
 
 ## Non-Goals
 
-- Change stream emission middleware → see `project/spec/editor/collaboration.md`
-- Remote change application and echo loop prevention → see `project/spec/editor/collaboration.md`
-- Undo/redo tracking → see `project/spec/editor/store-actions.md`
+- Persisting operation history in `.bsp`
+- Defining a network collaboration protocol
+- Using array index as durable identity

@@ -10,11 +10,11 @@ Defines the behavioral requirements for editor property panels and sidebars: the
 
 ### Requirement: Properties Sidebar Rendering
 
-The system MUST render the selected element from the native document. In screen mode, gradient fill switcher MUST be visible for rectangle elements. In print mode, gradient fill and 3D transform controls MUST be hidden. When a component registry provides a custom property panel for an element type, it MUST be rendered. When `showAnimations` is false, the animation builder MUST be hidden.
+The system MUST render the selected canonical element. For motion/static documents, gradient controls MUST be visible for vector rectangles. For print documents, host policy MAY hide gradient and 3D authoring controls without changing canonical validity. When a plugin registry provides an authorized property panel for a matching canonical plugin element, it MUST render. When `showAnimations` is false, the animation builder is hidden.
 
 **Panel Ordering:**
 
-The Properties sidebar MUST present accordion sections in this order. Each section MUST use a HeroUI `Accordion` panel with an icon next to the section title. Sections MUST only appear when relevant to the selected element type and document mode:
+The Properties sidebar MUST present accordion sections in this order. Each section MUST use a HeroUI `Accordion` panel with an icon next to the section title. Sections MUST only appear when relevant to the selected canonical kind/subtype and document `kind`:
 
 | #   | Section           | Shown for                           | Hidden in print mode |
 | --- | ----------------- | ----------------------------------- | -------------------- |
@@ -25,13 +25,13 @@ The Properties sidebar MUST present accordion sections in this order. Each secti
 | 5   | Spacing           | Text and group elements             | No                   |
 | 6   | Box Effects       | All elements                        | Partially            |
 | 7   | Clip Path         | Elements with `clipPath` capability | No                   |
-| 8   | Path Properties   | Path and SVG elements               | No                   |
+| 8   | Path Properties   | Vector path elements                | No                   |
 | 9   | Image             | Image elements                      | No                   |
 | 10  | Object Fit        | Elements with objectFit capability  | No                   |
 | 11  | QR Code           | QR code elements                    | No                   |
 | 12  | Group             | Group elements                      | No                   |
 | 13  | Animation Builder | All elements (if enabled)           | No                   |
-| 14  | Custom Panel      | Custom plugin types                 | No                   |
+| 14  | Plugin Panel      | Registered plugin elements          | No                   |
 
 **Empty State:**
 
@@ -39,46 +39,47 @@ When no element is selected, the Properties sidebar MUST show a "Select an eleme
 
 #### Scenario: Gradient fill in screen mode
 
-- GIVEN a rectangle element selected in screen mode
+- GIVEN a vector rectangle selected in a motion document
 - WHEN the properties sidebar renders
 - THEN the gradient fill switcher is visible
 
 #### Scenario: Print mode hides advanced controls
 
-- GIVEN print document mode
+- GIVEN a print document
 - WHEN the properties sidebar renders
-- THEN gradient fill, 3D transforms, and clip children controls are hidden
+- THEN host-restricted gradient and 3D controls are hidden
 
 #### Scenario: Custom property panel rendered
 
-- GIVEN a registry with a property panel for type `countdown`
-- WHEN an element of that type is selected
+- GIVEN a registry with a property panel for plugin element type `countdown`
+- WHEN a matching canonical plugin element is selected
 - THEN the custom property panel is rendered
 
 #### Acceptance Criteria
 
-- [ ] Given a rectangle element selected in screen mode, the gradient fill switcher is visible
-- [ ] Given print document mode, gradient fill, 3D transforms, and clip children controls are hidden
-- [ ] Given a registry with a property panel for type `countdown`, the custom property panel is rendered
+- [ ] Given a vector rectangle in a motion/static document, the gradient fill switcher is visible
+- [ ] Given a print document with host restrictions, gradient and 3D controls are hidden
+- [ ] Given a registry with an authorized plugin panel, it renders for a matching canonical plugin element
 
 ---
 
 ### Requirement: Animation Mode Properties
 
-When a keyframe is selected, the system MUST render an AnimationModePropertiesPanel wrapped in a PropertyEditingProvider. Geometry and Typography panels MUST be rendered for text elements. Animation Builder and Group Settings MUST NOT render in animation mode.
+When a stable keyframe is selected, the system MUST render an AnimationModePropertiesPanel wrapped in a PropertyEditingProvider. The panel shows the selected track's schema-approved target/value editor and compatible interpolation controls. Geometry and Typography panels MAY show other animatable properties as track-creation affordances. Sequence Builder and Group Settings MUST NOT render in keyframe mode.
 
-The PropertyEditingProvider MUST expose a keyframe property adapter that routes property edits to keyframe values instead of element values. The adapter contract:
+The PropertyEditingProvider MUST expose a typed track/keyframe adapter:
 
-- `isIncluded(key)` — returns whether the property is part of this keyframe.
-- `getValue(key)` — returns the current keyframe value for the property.
-- `toggleProperty(key, included, defaultValue)` — adds or removes a property from the keyframe.
-- `updateValue(key, value)` — sets the keyframe value for the property.
+- `target` — the selected track's stable `PropertyTarget`.
+- `getValue()` — returns the selected keyframe's typed value.
+- `updateValue(value)` — validates and commits the selected keyframe's typed value.
+- `createTrack(target, tick, initialValue)` — creates a fresh stable track/keyframe for another schema-approved property.
+- `removeKeyframe(trackId, keyframeId)` — removes the addressed keyframe and removes the track only if it becomes empty.
 
 When the adapter is active (keyframe selected):
 
-- Properties included in the keyframe MUST be editable and route changes to `updateValue`.
-- Properties NOT included MUST render as disabled (read-only, showing the element's base value).
-- Each property MUST show an include/remove toggle button.
+- The selected track target MUST be editable and route to `updateValue`.
+- Other schema-approved properties without a track/keyframe at that tick render their resolved base value read-only with an Add Track button.
+- Add Track creates a separate stable typed track/keyframe at the same exact tick; Remove deletes the addressed keyframe/empty track rather than mutating a multi-property bag.
 
 When no adapter is active (normal mode), all properties route to element updates.
 
@@ -88,30 +89,30 @@ When no adapter is active (normal mode), all properties route to element updates
 - WHEN the sidebar renders
 - THEN AnimationModePropertiesPanel is shown with PropertyEditingProvider
 
-#### Scenario: Included property routes to keyframe
+#### Scenario: Selected track value routes to keyframe
 
-- GIVEN a keyframe with `x` included at value `100`
-- WHEN the user changes `x` to `200`
-- THEN the adapter's `updateValue('x', '200')` is called (not the element update)
+- GIVEN a selected opacity-track keyframe with value `0.5`
+- WHEN the user changes it to `0.8`
+- THEN `updateValue(0.8)` is called and the base element appearance is unchanged
 
 #### Scenario: Excluded property is disabled
 
-- GIVEN a keyframe that does not include `opacity`
+- GIVEN no opacity track/keyframe at the selected tick
 - WHEN the property panel renders
 - THEN `opacity` shows the element's base value and is disabled
 
 #### Acceptance Criteria
 
 - [ ] Given a selected keyframe, AnimationModePropertiesPanel is shown with PropertyEditingProvider
-- [ ] Given a keyframe with a property included, editing routes to the adapter's updateValue
-- [ ] Given a keyframe without a property included, the property renders as disabled with the element's base value
-- [ ] Given a property toggle to include, toggleProperty is called with included=true and the element's current value as default
+- [ ] Given a selected track keyframe, editing routes to its typed `updateValue`
+- [ ] Given no track for another property at that tick, its resolved base value is read-only with Add Track
+- [ ] Given Add Track, a fresh stable typed track/keyframe is created at the same exact tick
 
 ---
 
 ### Requirement: Box Effects Panel
 
-The system MUST render compositing helper text and controls (mixBlendMode, isolation) in screen mode. Print mode without relevant style properties MUST hide the panel.
+The system MUST render compositing helper text and typed appearance controls in motion/static documents. A print document without relevant typed appearance layers MUST hide the panel.
 
 **Fields:**
 
@@ -126,44 +127,44 @@ The system MUST render compositing helper text and controls (mixBlendMode, isola
 
 The panel MUST use HeroUI `Accordion` sections to group shadow, filter, backdrop-filter, and compositing controls.
 
-#### Scenario: Screen mode compositing controls
+#### Scenario: Motion document compositing controls
 
-- GIVEN screen document mode
+- GIVEN a document with `kind: 'motion'`
 - WHEN box effects panel renders
 - THEN compositing controls are visible
 
 #### Acceptance Criteria
 
-- [ ] Given screen document mode, compositing controls are visible
+- [ ] Given a motion or static document with relevant appearance capability, compositing controls are visible
 
 ---
 
 ### Requirement: Clip-Path Panel
 
-The Clip Path accordion section MUST only appear when the selected element has the `clipPath` capability flag enabled (rectangle, ellipse, image, svg, group). It MUST NOT appear for text, path, or qrcode elements.
+The Clip Path accordion section MUST only appear when the selected element has the derived `clipPath` capability. Eligible canonical variants include vector rectangle/ellipse, image, sanitized-vector foreign, and group. The historical UI label authors typed `appearance.clip`; it MUST NOT write CSS strings or retired unversioned screen/style fields.
 
-The panel MUST show the current mask type and provide controls for selecting and editing clip-path shapes.
+The panel MUST show the current typed clip/mask kind and provide controls for selecting or creating compatible vector clip sources.
 
 **Preset Clip Shapes:**
 
 The panel MUST provide a selector with built-in clip-path presets:
 
-| Preset   | Generated clip-path           |
+| Preset   | Generated canonical geometry  |
 | -------- | ----------------------------- |
-| None     | removes clip-path             |
-| Circle   | `circle(50%)`                 |
-| Squircle | smooth rounded-rectangle path |
-| Triangle | 3-point polygon               |
-| Star     | 5-point star polygon          |
+| None     | removes typed clip reference  |
+| Circle   | vector ellipse                |
+| Squircle | structured rounded path       |
+| Triangle | 3-point structured path       |
+| Star     | 5-point structured star path  |
 | Custom   | opens visual clip-path editor |
 
-Selecting a preset MUST immediately apply the clip-path to the element's `customClipPath` screen property, set `maskType` to `'custom'` (or `'none'` for the None preset), and update the canvas in real time.
+Selecting a preset MUST atomically create or update a vector clip-source element with fresh stable identity as needed, set `appearance.clip` to its typed reference, and update the canvas. None removes the reference and any now-unreferenced dedicated source atomically.
 
 **Custom Clip-Path Editor Widget:**
 
 When the user selects the "Custom" preset or clicks "Edit Clip Path" on an element already using a custom clip-path, the system MUST enter clip-path editing mode. This mode MUST:
 
-1. **Show a start/stop toggle** — a Button in the panel to enter and exit editing mode. When editing starts, if the clip-path is empty, a default rectangular path (matching the element bounds) MUST be seeded.
+1. **Show a start/stop toggle** — a Button in the panel enters and exits editing mode. If no clip exists, editing starts by creating a default vector rectangle source matching element bounds.
 2. **Render an SVG overlay on the canvas** — an interactive clip-path outline drawn on top of the selected element, showing:
    - **Anchor handles** (filled circles) at each control point of the clip-path polygon/path
    - **Midpoint handles** (smaller, hollow circles) on each edge segment, for inserting new points
@@ -171,8 +172,8 @@ When the user selects the "Custom" preset or clicks "Edit Clip Path" on an eleme
 3. **Support handle drag** — dragging an anchor handle MUST update the corresponding clip-path coordinate in real time (ephemeral updates). On mouseup, the change MUST be committed to the store.
 4. **Support point insertion** — clicking a midpoint handle MUST insert a new anchor point at that position and enter drag mode for it immediately.
 5. **Support point deletion** — double-clicking an anchor handle (or pressing Delete with a handle focused) MUST remove that point from the clip-path. A clip-path MUST retain at least 3 points.
-6. **Raw CSS input** — the panel MUST also provide a text input field showing the raw `customClipPath` CSS value. Editing this field MUST validate the input and apply it live. Invalid values MUST show a validation error and not be committed.
-7. **Coordinate system** — all handle coordinates MUST be in element-relative percentages (0%–100%), matching CSS clip-path conventions.
+6. **Structured coordinate editor** — the panel MUST provide numeric controls for each stable point ID. Invalid or non-finite coordinates show a validation error and do not commit.
+7. **Coordinate system** — handle coordinates use the clip source's typed element-local geometry and owning surface unit; normalized display MAY be derived for UI convenience.
 8. **Exit behavior** — clicking outside the element, selecting a different element, or pressing Escape MUST exit clip-path editing mode and commit any pending changes.
 
 #### Scenario: Start editing seeds default path
@@ -183,9 +184,9 @@ When the user selects the "Custom" preset or clicks "Edit Clip Path" on an eleme
 
 #### Scenario: Preset applies immediately
 
-- GIVEN a rectangle element selected
+- GIVEN an eligible vector rectangle selected
 - WHEN the "Circle" preset is selected in the Clip Path panel
-- THEN `maskType` is set to `'custom'` and `customClipPath` is set to `circle(50%)`
+- THEN a vector ellipse clip source is created and `appearance.clip` references it
 
 #### Scenario: Handle drag updates clip-path
 
@@ -205,36 +206,36 @@ When the user selects the "Custom" preset or clicks "Edit Clip Path" on an eleme
 - WHEN the user attempts to delete a point
 - THEN the deletion is rejected (minimum 3 points)
 
-#### Scenario: Raw CSS input validation
+#### Scenario: Structured coordinate validation
 
 - GIVEN clip-path editing mode is active
-- WHEN the user types `polygon(50% 0%, 100% 100%, 0% 100%)` in the raw input
-- THEN the clip-path is applied and the canvas overlay updates
+- WHEN the user enters finite coordinates for a stable point ID
+- THEN structured clip-source geometry updates and the canvas overlay follows
 
-#### Scenario: Invalid raw input shows error
+#### Scenario: Invalid coordinate shows error
 
 - GIVEN clip-path editing mode is active
-- WHEN the user types `not-valid-css` in the raw input
+- WHEN the user enters a non-finite coordinate
 - THEN a validation error is shown and the clip-path is not changed
 
 #### Scenario: None preset removes clip-path
 
 - GIVEN an element with a custom clip-path applied
 - WHEN the "None" preset is selected
-- THEN `maskType` is set to `'none'` and `customClipPath` is cleared
+- THEN the typed clip reference and unreferenced dedicated source are removed atomically
 
 #### Acceptance Criteria
 
 - [ ] Given an element with an empty clip-path, a default rectangular path is seeded matching element bounds
 - [ ] Given a preset selection (Circle, Triangle, Star, Squircle), the clip-path is applied immediately to the element
-- [ ] Given the None preset, maskType is set to 'none' and customClipPath is cleared
+- [ ] Given the None preset, the typed clip reference and unreferenced dedicated source are removed
 - [ ] Given clip-path editing mode, anchor handles are rendered on the canvas overlay at each control point
 - [ ] Given a handle drag, the clip-path updates in real time
 - [ ] Given a midpoint handle click, a new point is inserted into the clip-path
 - [ ] Given a point deletion attempt with > 3 points, the point is removed
 - [ ] Given a point deletion attempt with exactly 3 points, the deletion is rejected
-- [ ] Given valid raw CSS input, the clip-path is applied and canvas overlay updates
-- [ ] Given invalid raw CSS input, a validation error is shown
+- [ ] Given valid structured coordinates, clip-source geometry and canvas overlay update
+- [ ] Given invalid structured coordinates, a validation error is shown and no mutation commits
 - [ ] Given exit actions (Escape, click-outside, selection change), editing mode exits and changes are committed
 
 ---
@@ -264,7 +265,7 @@ The system MUST render a success notification when there are no issues. When iss
 
 ### Requirement: Animation Sidebar
 
-The system MUST render the animation builder when an element is selected and animations are enabled. Empty state MUST be shown when no element is selected. Disabled state MUST be shown when animation feature is off. Lock helper text MUST appear when the selected element is locked.
+The system MUST render the sequence builder when an element is selected and sequence authoring is enabled. It edits document-owned sequences or component-owned sequences in the selected element's identity scope; it never creates a per-element animation registry. Empty state MUST appear without selection, disabled state when sequence authoring is off, and lock helper text when the selected element is locked.
 
 **Header:**
 
@@ -274,16 +275,16 @@ The sidebar MUST display the active element's name and a type chip (HeroUI `Chip
 
 The animation builder MUST be organized as a HeroUI `Accordion` with these sections:
 
-| Section                    | Content                                                                                                                                                                                                                                                  |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Active States & Modifiers  | State selector dropdown (None, Enter, Exit, custom states); modifier checkboxes for each defined modifier (independent toggles)                                                                                                                          |
-| Timelines                  | List of timelines for the element, each with: Edit button (opens TimelineEditor in bottom panel), Rename, Duplicate, Delete actions. "Add Timeline" button creates a new timeline. "Quick setup" button creates Enter/Exit animations with preset values |
-| State Timeline Bindings    | Maps states to timelines. State selector + timeline selector per binding. "Add binding" button links a timeline to a state                                                                                                                               |
-| Modifier Timeline Bindings | Maps modifiers to timelines. Modifier selector + in/out timeline pair. "Add/remove binding" buttons                                                                                                                                                      |
+| Section         | Content                                                                                                                                                                                |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lifecycle       | IN, HOLD/UPDATE, and OUT phase controls referencing resolving sequence IDs (play/stop/seek)                                                                                            |
+| Sequences       | Lists document/component sequences with Edit, Rename, Duplicate, Delete, and Add Sequence actions; Quick Setup creates explicit IN/OUT sequences with typed tracks and `durationTicks` |
+| Property tracks | Stable typed tracks targeting the selected element through `PropertyTarget`; opens TimelineEditor for exact-tick keyframe editing                                                      |
+| State machines  | Stable states/transitions, typed triggers and guards, deterministic priority, and optional transition sequence actions; friendly independent toggles compile to two-state machines     |
 
-#### Scenario: Element selected with animations on
+#### Scenario: Element selected with sequence authoring on
 
-- GIVEN an element selected and animation feature enabled
+- GIVEN an element selected and sequence authoring enabled
 - WHEN the sidebar renders
 - THEN the animation builder is visible
 
@@ -295,30 +296,30 @@ The animation builder MUST be organized as a HeroUI `Accordion` with these secti
 
 #### Acceptance Criteria
 
-- [ ] Given an element selected and animation feature enabled, the animation builder is visible
+- [ ] Given an element selected and sequence authoring enabled, the builder is visible
 - [ ] Given a locked element selected, lock helper text is displayed
 
 ---
 
-### Requirement: Animation Builder Resilience
+### Requirement: Sequence Builder Resilience
 
-The system MUST NOT crash when animation config is partial or malformed.
+The system MUST NOT crash when its selected sequence/track/state-machine reference becomes stale between renders. Invalid canonical project data is rejected before UI hydration; the builder shows a diagnostic/empty state rather than attempting to edit a partial pre-v1 configuration.
 
 #### Scenario: Partial config does not crash
 
-- GIVEN a malformed animation config
+- GIVEN a runtime selection referencing a sequence removed by a concurrent valid project update
 - WHEN the builder renders
 - THEN no error is thrown
 
 #### Acceptance Criteria
 
-- [ ] Given a malformed animation config, no error is thrown
+- [ ] Given a stale runtime selection, no error is thrown and the builder exposes a recoverable empty/diagnostic state
 
 ---
 
-### Requirement: Property Field Keyframe Integration
+### Requirement: Property Field Track Integration
 
-In normal mode, the system MUST render children directly. In keyframe mode, the system MUST show include/remove buttons. Including a property MUST call `toggleProperty(key, true, defaultValue)`. Removing MUST call `toggleProperty(key, false, defaultValue)`.
+In normal mode, PropertyField renders its normal canonical editor. In keyframe mode, the selected track target shows its typed editor/remove-keyframe action; other animatable properties show read-only resolved values plus Add Track. Add Track calls `createTrack(target, tick, initialValue)`. Remove calls `removeKeyframe(trackId, keyframeId)` and removes an empty track without leaving stale sequence references.
 
 #### Scenario: Normal mode renders children
 
@@ -326,22 +327,22 @@ In normal mode, the system MUST render children directly. In keyframe mode, the 
 - WHEN PropertyField renders
 - THEN children are rendered directly
 
-#### Scenario: Keyframe include/remove
+#### Scenario: Track create/remove
 
 - GIVEN keyframe mode active
-- WHEN include/remove buttons are clicked
-- THEN toggleProperty is called with correct arguments
+- WHEN Add Track or Remove is clicked
+- THEN the adapter creates/removes stable track/keyframe identities with type-compatible values
 
 #### Acceptance Criteria
 
 - [ ] Given no keyframe mode, children are rendered directly
-- [ ] Given keyframe mode active, toggleProperty is called with correct arguments
+- [ ] Given keyframe mode, create/remove actions operate on stable typed tracks/keyframes rather than property bags
 
 ---
 
 ### Requirement: Layers Sidebar
 
-The system MUST render element names from the document. Empty state MUST be shown when no elements exist. Clicking a layer MUST fire setActiveElement. Lock button MUST toggle lock. Visibility toggle MUST update element classes. Delete button MUST remove the element.
+The system MUST render element names from the canonical hierarchy. Empty state appears with no elements. Clicking a layer updates runtime selection; Lock toggles canonical `locked`; Visibility edits the active page's typed root/descendant `visible` override by stable instance path; Delete removes the element through a hierarchy-valid atomic command.
 
 **Layer Row Structure:**
 
@@ -389,7 +390,7 @@ Dropping MUST update the element z-order in the document.
 
 **Visibility Toggle Semantics:**
 
-The visibility toggle MUST set the element's `visibility` class property to `'onscreen'` (visible) or `'offscreen'` (hidden). This is a class-level property, not a style property — hidden elements remain in the DOM but are not rendered.
+The visibility toggle MUST address the selected active-page root instance or descendant override by stable instance path and set its typed `visible` override. It MUST NOT add an element-level `visibility` field. Editor-only hiding uses `hiddenInEditor` as a separate command. Resolved invisible instances MAY remain mounted for DOM stability but do not paint or participate in hit testing.
 
 #### Scenario: Layer click selects element
 
@@ -422,13 +423,13 @@ The visibility toggle MUST set the element's `visibility` class property to `'on
 - [ ] Given a drag operation, it only initiates from the grip icon zone
 - [ ] Given a drop into own descendant, the drop is rejected
 - [ ] Given a new element added, it appears at the top of the layer list
-- [ ] Given a visibility toggle, the element's visibility class is set to 'onscreen' or 'offscreen'
+- [ ] Given a visibility toggle, the active page's typed root/descendant instance override changes by stable identity without adding an element visibility field
 
 ---
 
 ### Requirement: Geometry Panel
 
-GeometryPanel MUST display and edit element position (x, y), size (width, height), and rotation. Changes MUST be committed to the store.
+GeometryPanel MUST display friendly position, size, rotation, and origin controls derived from canonical bounds and the exact affine/3D matrix. Commits update bounds, origin, and one exact matrix; decomposed values and edge anchors remain runtime UI state.
 
 **Fields:**
 
@@ -443,7 +444,7 @@ GeometryPanel MUST display and edit element position (x, y), size (width, height
 | Anchor X     | toggle group | No           | left / right (determines transform origin)       |
 | Anchor Y     | toggle group | No           | top / bottom                                     |
 
-**3D Transform Fields (screen mode only, hidden in print mode):**
+**Derived 3D Transform Fields (host-enabled, optionally hidden for print):**
 
 | Field      | Input type   | Keyframeable | Notes                     |
 | ---------- | ------------ | ------------ | ------------------------- |
@@ -452,11 +453,11 @@ GeometryPanel MUST display and edit element position (x, y), size (width, height
 | RotateZ    | numeric (°)  | Yes          | 3D rotation around Z axis |
 | TranslateZ | numeric (px) | Yes          | Z-axis displacement       |
 
-Anchor toggles MUST use HeroUI `ButtonGroup`. Numeric fields MUST use `NumField` (HeroUI `NumberField` wrapper). Unit selection MUST be preserved within the editing session.
+Anchor toggles MUST use HeroUI `ButtonGroup`. Numeric fields MUST use `NumField`. Unit selection and anchor preference are preserved within the editing session but are not project fields. Friendly 3D edits recompose the exact sixteen-number matrix.
 
 **Anchor-Relative Position Display:**
 
-When `anchorX` is `'right'`, the X field MUST display the position relative to the right edge of the canvas (`canvasWidth - x - width`). When `anchorY` is `'bottom'`, the Y field MUST display the position relative to the bottom edge (`canvasHeight - y - height`). The field label MUST dynamically reflect the anchor direction (e.g. "X (Right mm)" vs "X (mm)"). Editing the value MUST convert back to the internal left/top-origin coordinate before committing.
+When runtime `anchorX` is right, X displays relative to the right edge of `surface.size`; bottom anchor behaves likewise for Y. Labels reflect direction and `surface.unit`. Editing converts the friendly value to an exact matrix translation before commit.
 
 **Width/Height Minimum:**
 
@@ -470,14 +471,14 @@ Displayed width and height values MUST be clamped to a minimum of 0.1 in the cur
 
 #### Scenario: Right-anchored position display
 
-- GIVEN an element at x=100, width=80 on a 1920-wide canvas with anchorX='right'
+- GIVEN an element at resolved x=100, width=80 on a 1920-wide surface with runtime anchorX right
 - WHEN the Geometry panel renders
 - THEN the X field shows 1740 (1920 - 100 - 80) and the label reads "X (Right ...)"
 
 #### Acceptance Criteria
 
-- [ ] Given a selected element, position, size, and rotation fields are editable
-- [ ] Given a value change, the update is committed to the store
+- [ ] Given a selected element, derived position, size, rotation, and origin fields are editable when matrix decomposition is stable
+- [ ] Given a value change, exact bounds/origin/matrix data is committed
 - [ ] Given anchorX='right', the X field displays the right-edge-relative value
 - [ ] Given anchorY='bottom', the Y field displays the bottom-edge-relative value
 - [ ] Given anchor labels, they dynamically reflect the anchor direction
@@ -487,7 +488,7 @@ Displayed width and height values MUST be clamped to a minimum of 0.1 in the cur
 
 ### Requirement: Appearance Panel
 
-AppearancePanel MUST display and edit fill color, background gradient, border (width, color, style, radius), opacity, and blend mode for the selected element.
+AppearancePanel MUST display and edit ordered typed fills, strokes, effects, opacity, blend mode, isolation, clip, and mask. Stable layer IDs and semantic order are preserved. Vector rectangle corner radii are geometry controls; other rounded clipping uses typed clip geometry.
 
 **Fields:**
 
@@ -502,7 +503,7 @@ AppearancePanel MUST display and edit fill color, background gradient, border (w
 | Border radius       | 4× NumField + link  | Yes          | Individual corners; link toggle for uniform radius                                                                                                             |
 | Blend mode          | HeroUI Select       | No           | normal, multiply, screen, overlay, darken, lighten, color-dodge, color-burn, hard-light, soft-light, difference, exclusion, hue, saturation, color, luminosity |
 
-The gradient editor MUST allow adding, removing, and repositioning color stops along the gradient axis. A fill-type switcher MUST toggle between solid color and gradient modes (visible in screen mode only — hidden in print mode). The border-radius link toggle, when active, MUST synchronize all four corner values when any single corner is edited.
+The gradient editor MUST allow adding, removing, and repositioning stable typed color stops along the gradient geometry. A fill-type switcher toggles typed solid and gradient paint. A vector-rectangle corner-radius link toggle synchronizes all four typed `cornerRadii` when active.
 
 **Gradient Editor Interaction Details:**
 
@@ -514,58 +515,59 @@ The gradient editor MUST allow adding, removing, and repositioning color stops a
 
 #### Scenario: Change fill color
 
-- GIVEN a rectangle element selected
-- WHEN the fill color is changed to `'#00ff00'`
-- THEN the element's background color is updated
+- GIVEN a vector rectangle selected
+- WHEN the fill color is changed to typed sRGB green
+- THEN the selected fill layer's typed color is updated
 
 #### Acceptance Criteria
 
 - [ ] Given a selected element, fill, border, opacity, and blend mode are editable
-- [ ] Given a style change, the update is committed to the store
+- [ ] Given an appearance change, the typed layer update is committed to the store
 
 ---
 
 ### Requirement: Image Panel
 
-ImagePanel MUST display and edit image source URL and object-fit for image-type elements. It MUST only appear for image elements.
+ImagePanel MUST select a compatible project image asset and edit typed fit, crop, and focal point. It MUST only appear for image elements. External URL entry is an asset import/relink action; it does not write a URL into the element payload.
 
-#### Scenario: Change image source
+#### Scenario: Change image asset
 
 - GIVEN an image element selected
-- WHEN the source URL is changed
-- THEN the element's content is updated with the new URL
+- WHEN another compatible project asset is selected
+- THEN typed `image.assetId` is updated after reference validation
 
 #### Acceptance Criteria
 
-- [ ] Given an image element, source URL and object-fit are editable
+- [ ] Given an image element, asset, fit, crop, and focal point are editable
+- [ ] Given an external URL import, a project asset is created or resolved before the element reference changes
 - [ ] Given a non-image element, the image panel does not appear
 
 ---
 
 ### Requirement: Path Properties Panel
 
-PathPropertiesPanel MUST display and edit SVG stroke, fill, stroke-width, dasharray, dashoffset, linecap, linejoin, and fill-rule for path and SVG elements.
+PathPropertiesPanel MUST appear for `kind: 'vector'` with `geometryData.kind: 'path'`. It edits ordered typed stroke/fill appearance layers and the path payload's fill rule while preserving structured point/segment identity.
 
 **Fields:**
 
-| Field             | Input type                 | Notes                                                                                         |
-| ----------------- | -------------------------- | --------------------------------------------------------------------------------------------- |
-| Stroke color      | ColorInput                 | SVG stroke color                                                                              |
-| Stroke width      | NumField (min 0, step 0.5) | SVG stroke-width                                                                              |
-| Stroke opacity    | HeroUI Slider (0–1)        | Transparency of stroke                                                                        |
-| Stroke dasharray  | text input                 | CSS dasharray pattern                                                                         |
-| Stroke dashoffset | HeroUI Slider              | Dash offset (animatable)                                                                      |
-| Stroke linecap    | HeroUI Select              | butt / round / square                                                                         |
-| Stroke linejoin   | HeroUI Select              | miter / round / bevel                                                                         |
-| Fill color        | ColorInput                 | SVG fill color (or "none")                                                                    |
-| Fill opacity      | HeroUI Slider (0–1)        | Transparency of fill                                                                          |
-| Fill rule         | HeroUI Select              | nonzero / evenodd                                                                             |
-| Draw Path         | toggle button              | Activates click-to-place drawing mode                                                         |
-| Edit Path Points  | toggle button              | Activates point-editing overlay. Only enabled when path has content (non-empty `d` attribute) |
+| Field             | Input type                 | Notes                                                                     |
+| ----------------- | -------------------------- | ------------------------------------------------------------------------- |
+| Stroke color      | ColorInput                 | typed stroke-layer color                                                  |
+| Stroke width      | NumField (min 0, step 0.5) | stroke width in surface units                                             |
+| Stroke opacity    | HeroUI Slider (0–1)        | Transparency of stroke                                                    |
+| Stroke dasharray  | numeric list editor        | typed dash lengths in surface units                                       |
+| Stroke dashoffset | HeroUI Slider              | Dash offset (animatable)                                                  |
+| Stroke linecap    | HeroUI Select              | butt / round / square                                                     |
+| Stroke linejoin   | HeroUI Select              | miter / round / bevel                                                     |
+| Fill color        | ColorInput                 | typed fill-layer color or `none` paint                                    |
+| Fill opacity      | HeroUI Slider (0–1)        | Transparency of fill                                                      |
+| Fill rule         | HeroUI Select              | nonzero / evenodd                                                         |
+| Draw Path         | toggle button              | Activates click-to-place drawing mode                                     |
+| Edit Path Points  | toggle button              | Activates point editing; enabled when structured path has editable points |
 
-**Factory Defaults for New Path Elements:**
+**Factory Defaults for New Vector Paths:**
 
-New path elements MUST be created with these style defaults:
+New vector paths MUST use a default solid black stroke layer and none fill paint with these typed properties:
 
 | Property         | Default value |
 | ---------------- | ------------- |
@@ -583,75 +585,73 @@ New path elements MUST be created with these style defaults:
 **Toggle Button Behavior:**
 
 - **Draw Path:** Pressing toggles between `startPathDrawing(elementId)` and `stopPathDrawing()`. Button label MUST change to "Done Drawing" when active.
-- **Edit Path Points:** Pressing toggles between `startPathEditing(elementId)` and `stopPathEditing()`. Button label MUST change to "Done Editing Points" when active. This button MUST be disabled when the path's content is empty (nothing to edit).
+- **Edit Path Points:** Pressing toggles between `startPathEditing(elementId)` and `stopPathEditing()`. Button label MUST change to "Done Editing Points" when active. This button MUST be disabled when structured path geometry has no editable points.
 - Only one mode can be active at a time — entering one MUST exit the other (see editor/editing.md for state rules).
 
 #### Scenario: Change stroke width
 
-- GIVEN a path element selected
+- GIVEN a vector path selected
 - WHEN stroke-width is changed to 3
-- THEN the element's stroke-width style is updated
+- THEN the selected typed stroke layer's width is updated
 
 #### Scenario: Edit path toggle disabled for empty path
 
-- GIVEN a path element with empty content
+- GIVEN a vector path with no editable points
 - WHEN the Path Properties panel renders
 - THEN the "Edit Path Points" button is disabled
 
 #### Acceptance Criteria
 
-- [ ] Given a path element, SVG stroke and fill properties are editable
-- [ ] Given a path element, draw path and edit path point toggle buttons are available
-- [ ] Given a path element with empty content, the edit path points button is disabled
-- [ ] Given a non-path/SVG element, path properties do not appear
+- [ ] Given a vector path, typed stroke/fill layers and fill rule are editable
+- [ ] Given a vector path, draw and edit-point toggles are available
+- [ ] Given no editable structured points, edit points is disabled
+- [ ] Given another canonical variant, path properties do not appear
 
 ---
 
 ### Requirement: QR Code Panel
 
-QrCodePanel MUST display and edit QR code content string, error correction level, and foreground/background colors.
+QrCodePanel MUST display and edit the typed QR payload value, error-correction level, and typed foreground/background colors.
 
 #### Scenario: Change QR content
 
 - GIVEN a qrcode element selected
-- WHEN the content string is changed
-- THEN the element's content is updated
+- WHEN the QR value is changed
+- THEN the typed QR payload is validated and updated
 
 #### Acceptance Criteria
 
-- [ ] Given a qrcode element, content, error correction, and colors are editable
+- [ ] Given a qrcode element, typed value, error correction, and colors are editable
 
 ---
 
 ### Requirement: Group Panel
 
-GroupPanel MUST display group-specific settings: clipChildren toggle, group name, and group opacity.
-Opacity MUST be presented as a percent-based slider (0–100%) and stored as a 0–1 style value.
-When document mode is print, clip-children controls MUST be unavailable and an explanatory helper message MUST be shown.
+GroupPanel MUST display group name, group opacity, and typed clip/mask selection. Opacity is presented as 0–100% and stored as `appearance.opacity` from 0 through 1. A print host policy MAY hide clip authoring with explanatory helper text, but it MUST NOT create a rejected `clipChildren` field.
 
-#### Scenario: Toggle clip children
+#### Scenario: Select group clip
 
 - GIVEN a group element selected
-- WHEN clipChildren is toggled on
-- THEN the group's clipChildren property is set to true
+- WHEN a compatible vector clip source is selected
+- THEN the group's typed `appearance.clip` reference is updated
 
 #### Scenario: Edit group opacity
 
 - GIVEN a group element selected with opacity 0.5
 - WHEN the user moves the Group opacity slider to 80
-- THEN the group's opacity style is set to 0.8
+- THEN the group's `appearance.opacity` is set to 0.8
 
-#### Scenario: Print mode clip-children helper
+#### Scenario: Print policy clip helper
 
-- GIVEN a group element selected in print document mode
+- GIVEN a group element selected in a print document with host clip restriction
 - WHEN the Group panel renders
-- THEN the clip-children control is disabled and helper text explains it is unavailable
+- THEN the typed clip control is disabled and helper text explains the host restriction
 
 #### Acceptance Criteria
 
-- [ ] Given a group element, clipChildren toggle and group name are editable
+- [ ] Given a group element, typed clip selection and group name are editable
 - [ ] Given a group element, opacity is editable via a percent slider and stored as a 0–1 value
-- [ ] Given print mode, clip-children control is disabled and helper text is displayed
+- [ ] Given print host restriction, typed clip control is disabled and helper text is displayed
 
 ---
 
@@ -683,7 +683,7 @@ An "Advanced" toggle MUST reveal letter-spacing, word-spacing, text stroke, and 
 
 - GIVEN a text element selected
 - WHEN letter-spacing is set to 2
-- THEN the element's letterSpacing style is updated
+- THEN the selected runs' typed tracking property is updated
 
 #### Acceptance Criteria
 
@@ -694,7 +694,7 @@ An "Advanced" toggle MUST reveal letter-spacing, word-spacing, text stroke, and 
 
 ### Requirement: Spacing Panel
 
-SpacingPanel MUST display and edit padding values for the selected element.
+SpacingPanel MUST display schema-approved typed layout spacing for the selected variant. Text paragraph indents/spacing and group layout gap remain distinct properties; surface padding is edited in canvas settings. The panel MUST NOT write an open generic style bag.
 
 **Fields:**
 
@@ -710,7 +710,7 @@ The link toggle, when active, MUST synchronize all four side values when any ind
 
 - GIVEN a selected element
 - WHEN padding is changed to 10
-- THEN the element's padding style is updated
+- THEN the selected variant's typed layout padding is updated when that schema supports padding
 
 #### Acceptance Criteria
 
@@ -861,7 +861,7 @@ All panels (Properties, Layers, Animation, Preflight) MUST conform to WCAG 2.1 A
 
 ### Requirement: Variable Font Axis Controls
 
-When the selected text element uses a variable font (indicated by `variableAxes` in the font's `EditorConfig.allowedFonts` entry), the Text Effects panel MUST display axis slider controls below the font family selector. Each variable axis MUST render as a labeled HeroUI Slider with the axis name (e.g., "Weight", "Width", "Italic"), the axis tag (e.g., `wght`, `wdth`), and the min/max range from the font metadata. Moving a slider MUST update the element's `fontVariationSettings` style value in real time. When multiple axes are available, all MUST be shown simultaneously. When the selected font is not a variable font (no `variableAxes`), the axis controls MUST be hidden. The standard Font Weight control (bold toggle or weight range) MUST remain available alongside the axis controls — the axis slider takes precedence when a `wght` axis exists.
+When selected text uses a variable font resource with declared axes, the Text Effects panel MUST show a labeled HeroUI Slider for every axis with tag and min/max metadata. Moving a slider updates the selected runs' typed variation-axis map. When no axes exist, controls are hidden. Standard Font Weight remains available; a `wght` axis control takes precedence.
 
 #### Scenario: Show axis sliders for variable font
 
@@ -873,7 +873,7 @@ When the selected text element uses a variable font (indicated by `variableAxes`
 
 - GIVEN a Weight axis slider at value 450
 - WHEN the user drags the slider to 600
-- THEN `fontVariationSettings` updates to include `'wght' 600`
+- THEN the selected runs' typed axes map updates `wght` to 600
 
 #### Scenario: Non-variable font hides axis controls
 
@@ -892,7 +892,7 @@ When the selected text element uses a variable font (indicated by `variableAxes`
 
 ### Requirement: Auto-Size Mode Controls
 
-The Geometry panel MUST display an auto-size mode selector for text elements. The control MUST be a segmented button group (HeroUI ButtonGroup) with three options: **Fixed** (icon: lock), **Auto Height** (icon: vertical arrows), **Shrink to Fit** (icon: compress). The current `autoSize` value determines which segment is active. Clicking a segment MUST update the element's `autoSize` field. When `autoSize` is `'auto-height'`, the height field in the Geometry panel MUST be disabled (greyed out) since height is computed. When `autoSize` is `'shrink-to-fit'`, both width and height remain editable (they define the constraint box). For non-text elements, the auto-size control MUST be hidden.
+The Geometry panel MUST display a segmented auto-size selector for text elements with Fixed, Auto Height, and Shrink to Fit. The current typed text `layout.autoSize` value determines the active segment. Auto Height disables the derived height control; Shrink to Fit keeps both constraint bounds editable. Other element variants hide the control.
 
 #### Scenario: Show auto-size for text element
 
@@ -902,13 +902,13 @@ The Geometry panel MUST display an auto-size mode selector for text elements. Th
 
 #### Scenario: Switch to auto-height disables height field
 
-- GIVEN a text element with `autoSize: 'fixed'`
+- GIVEN a text element with `layout.autoSize: 'fixed'`
 - WHEN the user clicks "Auto Height"
-- THEN `autoSize` is set to `'auto-height'` and the height field becomes disabled
+- THEN `layout.autoSize` is set to `'auto-height'` and the height field becomes disabled
 
 #### Scenario: Hidden for non-text elements
 
-- GIVEN a rectangle element selected
+- GIVEN a vector rectangle selected
 - WHEN the Geometry panel renders
 - THEN no auto-size control is shown
 
@@ -923,46 +923,46 @@ The Geometry panel MUST display an auto-size mode selector for text elements. Th
 
 ### Requirement: Video Element Panel
 
-VideoPanel MUST appear for video-type elements and display controls for `typeConfig` properties:
+VideoPanel MUST appear for video elements and edit their typed video payload:
 
-| Field      | Input type    | Notes                                                   |
-| ---------- | ------------- | ------------------------------------------------------- |
-| Source URL | Text input    | The video content URL (edits element `content`)         |
-| Autoplay   | HeroUI Switch | Whether video autoplays on visibility                   |
-| Loop       | HeroUI Switch | Whether video loops                                     |
-| Muted      | HeroUI Switch | Whether audio is muted                                  |
-| Start time | NumField (s)  | Playback start position in seconds (min 0)              |
-| End time   | NumField (s)  | Playback end position in seconds (empty = end of video) |
+| Field    | Input type    | Notes                                 |
+| -------- | ------------- | ------------------------------------- |
+| Asset    | Asset picker  | Compatible project video asset        |
+| Autoplay | HeroUI Switch | Whether video autoplays on visibility |
+| Loop     | HeroUI Switch | Whether video loops                   |
+| Muted    | HeroUI Switch | Whether audio is muted                |
+| In time  | Time control  | Exact non-negative document tick      |
+| Out time | Time control  | Exact tick or asset duration          |
 
-A video preview thumbnail SHOULD be displayed when the source URL is valid. Changes to switch values MUST be committed immediately. Changes to numeric fields MUST be committed on blur or Enter.
+A preview thumbnail SHOULD display for a resolving compatible asset. Switches commit immediately; exact time controls commit on blur or Enter. External URL entry, if offered, imports or relinks a project asset before updating `video.assetId`.
 
-#### Scenario: Edit video source
+#### Scenario: Edit video asset
 
 - GIVEN a video element selected
-- WHEN the source URL is changed
-- THEN the element's content is updated
+- WHEN another compatible project video asset is selected
+- THEN typed `video.assetId` is updated
 
 #### Scenario: Toggle autoplay
 
-- GIVEN a video element with `typeConfig.autoplay: true`
+- GIVEN a video element with typed `autoplay: true`
 - WHEN the Autoplay switch is toggled off
-- THEN `typeConfig.autoplay` is set to `false`
+- THEN typed `autoplay` is set to false
 
 #### Acceptance Criteria
 
-- [ ] Given a video element, the VideoPanel appears with source URL, autoplay, loop, muted, start/end time controls
+- [ ] Given a video element, VideoPanel shows asset, autoplay, loop, muted, and exact in/out tick controls
 - [ ] Given a non-video element, the VideoPanel does not appear
-- [ ] Given a switch toggle, the corresponding typeConfig property is updated
+- [ ] Given a switch toggle, the corresponding typed video payload property is updated
 
 ---
 
 ### Requirement: Clock Element Panel
 
-ClockPanel MUST appear for clock-type elements and display controls for the format pattern and `typeConfig` properties:
+ClockPanel MUST appear for clock elements and edit their typed clock payload:
 
 | Field        | Input type    | Notes                                                                                                                       |
 | ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Format       | Text input    | Time format pattern (edits element `content`, e.g., `HH:mm:ss`)                                                             |
+| Format       | Text input    | Typed clock format pattern, e.g. `HH:mm:ss`                                                                                 |
 | Mode         | HeroUI Select | `realtime`, `countdown`, `countup`, `stopwatch`                                                                             |
 | Start value  | Text input    | Start time for countdown/countup (shown only in those modes)                                                                |
 | Target value | Text input    | Target time for countdown (shown only in countdown mode when `countdownTo` is empty)                                        |
@@ -972,13 +972,13 @@ Mode-dependent fields MUST be shown/hidden dynamically: Start value appears for 
 
 #### Scenario: Switch clock mode
 
-- GIVEN a clock element with `typeConfig.mode: 'realtime'`
+- GIVEN a clock element with `clock.mode: 'realtime'`
 - WHEN the Mode select is changed to `countdown`
 - THEN Start value, Target value, and Countdown to fields appear
 
 #### Scenario: Set absolute countdown
 
-- GIVEN a clock element with `typeConfig.mode: 'countdown'`
+- GIVEN a clock element with `clock.mode: 'countdown'`
 - WHEN the Countdown to field is set to `2026-04-05T15:00:00Z`
 - THEN Start value and Target value fields are hidden
 
@@ -986,7 +986,7 @@ Mode-dependent fields MUST be shown/hidden dynamically: Start value appears for 
 
 - GIVEN a clock element
 - WHEN the format is changed to `mm:ss`
-- THEN the element's content is updated to `mm:ss`
+- THEN `clock.format` is updated to `mm:ss`
 
 #### Acceptance Criteria
 
@@ -1000,15 +1000,15 @@ Mode-dependent fields MUST be shown/hidden dynamically: Start value appears for 
 
 ### Requirement: Ticker Element Panel
 
-TickerPanel MUST appear for ticker-type elements and display controls for ticker items and `typeConfig` properties:
+TickerPanel MUST appear for ticker elements and edit typed ticker items or binding plus typed motion properties:
 
-| Field     | Input type      | Notes                                                |
-| --------- | --------------- | ---------------------------------------------------- |
-| Items     | Editable list   | JSON array of text strings; add/remove/reorder items |
-| Speed     | NumField (px/s) | Scroll speed in pixels per second (1–2000)           |
-| Direction | HeroUI Select   | `left`, `right`, `up`, `down`                        |
-| Gap       | NumField (px)   | Gap between items in pixels (≥ 0)                    |
-| Paused    | HeroUI Switch   | Whether scrolling is paused                          |
+| Field     | Input type      | Notes                                       |
+| --------- | --------------- | ------------------------------------------- |
+| Items     | Editable list   | Stable typed text items; add/remove/reorder |
+| Speed     | NumField (px/s) | Scroll speed in pixels per second (1–2000)  |
+| Direction | HeroUI Select   | `left`, `right`, `up`, `down`               |
+| Gap       | NumField (px)   | Gap between items in pixels (≥ 0)           |
+| Paused    | HeroUI Switch   | Whether scrolling is paused                 |
 
 The items list MUST support adding new text items, removing items (minimum 1 item), and drag-to-reorder. Each item is a text input. Adding an item appends to the end with placeholder text "New item".
 
@@ -1020,9 +1020,9 @@ The items list MUST support adding new text items, removing items (minimum 1 ite
 
 #### Scenario: Change scroll direction
 
-- GIVEN a ticker element with `typeConfig.direction: 'left'`
+- GIVEN a ticker element with typed `direction: 'left'`
 - WHEN direction is changed to `up`
-- THEN `typeConfig.direction` is updated to `up`
+- THEN typed `direction` is updated to `up`
 
 #### Acceptance Criteria
 
@@ -1065,9 +1065,9 @@ The Layers sidebar MUST use the label **"Scenes"** instead of "Pages" for all us
 - [ ] **WCAG AA Panel Accessibility:** No automated tests verify ARIA roles, aria-expanded state, tab order, focus rings, or label associations — accessibility-focused component tests are needed for all panels.
 - [ ] **Variable Font Axis Controls:** No automated tests cover axis slider rendering, `fontVariationSettings` updates, or hiding for non-variable fonts — requires CT.
 - [ ] **Auto-Size Mode Controls:** No automated tests cover segmented control rendering, height field disabling, or hiding for non-text elements — requires CT.
-- [ ] **Video Element Panel:** No automated tests cover VideoPanel rendering or typeConfig property updates — requires CT.
-- [ ] **Clock Element Panel:** No automated tests cover ClockPanel rendering, mode-dependent field visibility, or typeConfig updates — requires CT.
-- [ ] **Ticker Element Panel:** No automated tests cover TickerPanel rendering, item list management, or typeConfig updates — requires CT.
+- [ ] **Video Element Panel:** No automated tests cover VideoPanel rendering or typed payload updates — requires CT.
+- [ ] **Clock Element Panel:** No automated tests cover ClockPanel rendering, mode-dependent field visibility, or typed payload updates — requires CT.
+- [ ] **Ticker Element Panel:** No automated tests cover TickerPanel rendering, item list management, or typed payload updates — requires CT.
 
 ---
 

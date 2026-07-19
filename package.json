@@ -28,6 +28,7 @@
     "quality:strict:workspaces": "npm run quality:strict -w @broadset/model && npm run quality:strict -w @broadset/playback && npm run quality:strict -w @broadset/renderer && npm run quality:strict -w @broadset/editor && npm run quality:strict -w @broadset/formats && npm run quality:strict -w @broadset/ui && npm run quality:strict -w @broadset/demo",
     "quality:all": "npm run quality:workspaces",
     "quality:all:strict": "npm run quality:strict:workspaces",
+    "schema:project": "npm run typecheck -w @broadset/model && node scripts/generate-project-schema.mjs",
     "lint:dead": "knip",
     "lint:typecoverage": "node scripts/clean-typecoverage-inputs.mjs && type-coverage --at-least 99.95",
     "audit:prod": "npm audit --omit=dev",
@@ -72,6 +73,8 @@
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "@vitest/coverage-v8": "^4.1.9",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.16.2",
@@ -90,6 +93,7 @@
     "svg-path-properties": "^2.0.0",
     "type-coverage": "^2.29.7",
     "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "zod": "^4.4.3"
   }
 }

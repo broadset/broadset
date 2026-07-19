@@ -1,0 +1,5796 @@
+{
+  "sampleProject": {
+    "$schema": "https://schema.broadset.dev/v1/project.schema.json",
+    "format": "broadset-project",
+    "schemaVersion": 1,
+    "id": "proj-broadcast-demo",
+    "metadata": {
+      "name": "BCS Sport — Live Match Package",
+      "createdAt": "2026-04-14T12:00:00Z",
+      "updatedAt": "2026-04-14T12:00:00Z"
+    },
+    "resources": {
+      "assets": [
+        {
+          "id": "asset-home-crest",
+          "name": "Home Team Crest",
+          "blob": {
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
+            "source": {
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
+            }
+          },
+          "kind": "image",
+          "metadata": {
+            "pixelWidth": 150,
+            "pixelHeight": 150,
+            "orientation": 1,
+            "hasAlpha": true,
+            "bitDepth": 8,
+            "colorModel": "rgb"
+          }
+        },
+        {
+          "id": "asset-away-crest",
+          "name": "Away Team Crest",
+          "blob": {
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
+            "source": {
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
+            }
+          },
+          "kind": "image",
+          "metadata": {
+            "pixelWidth": 150,
+            "pixelHeight": 150,
+            "orientation": 1,
+            "hasAlpha": true,
+            "bitDepth": 8,
+            "colorModel": "rgb"
+          }
+        },
+        {
+          "id": "asset-network-bug",
+          "name": "Network Bug",
+          "blob": {
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
+            "source": {
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
+            }
+          },
+          "kind": "image",
+          "metadata": {
+            "pixelWidth": 150,
+            "pixelHeight": 150,
+            "orientation": 1,
+            "hasAlpha": true,
+            "bitDepth": 8,
+            "colorModel": "rgb"
+          }
+        },
+        {
+          "id": "asset-player-headshot",
+          "name": "Player Headshot",
+          "blob": {
+            "digest": "sha256:fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c",
+            "byteLength": 70,
+            "mediaType": "image/png",
+            "source": {
+              "kind": "package",
+              "path": "blobs/sha256/fb2315504b5d11dcedce1df1635bdd3b8a8231bbd2e474cac6c012eb6f51389c"
+            }
+          },
+          "kind": "image",
+          "metadata": {
+            "pixelWidth": 150,
+            "pixelHeight": 150,
+            "orientation": 1,
+            "hasAlpha": true,
+            "bitDepth": 8,
+            "colorModel": "rgb"
+          }
+        },
+        {
+          "id": "asset-replay-clip",
+          "name": "Replay Clip",
+          "blob": {
+            "digest": "sha256:754ed2f212d495ae30ef2f68f8ab18b0ab162ce669f768373d79f72f1ba3c3bd",
+            "byteLength": 24,
+            "mediaType": "video/mp4",
+            "source": {
+              "kind": "package",
+              "path": "blobs/sha256/754ed2f212d495ae30ef2f68f8ab18b0ab162ce669f768373d79f72f1ba3c3bd"
+            }
+          },
+          "kind": "video",
+          "metadata": {
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "frameRate": {
+              "numerator": 25,
+              "denominator": 1
+            },
+            "durationTicks": 0,
+            "videoCodec": "unknown",
+            "hasAlpha": false,
+            "audioTracks": []
+          }
+        }
+      ],
+      "fonts": [
+        {
+          "id": "font-family-inter",
+          "familyName": "Inter",
+          "fallbackFontIds": [],
+          "faces": [
+            {
+              "id": "font-face-inter-regular",
+              "source": {
+                "kind": "system",
+                "postScriptName": "Inter"
+              },
+              "weight": 400,
+              "style": "normal",
+              "stretch": 100
+            }
+          ]
+        }
+      ],
+      "swatches": [],
+      "variables": [],
+      "styles": [],
+      "outputProfiles": []
+    },
+    "documents": [
+      {
+        "id": "doc-broadcast-main",
+        "name": "Premier League Live — Full HD",
+        "kind": "motion",
+        "surface": {
+          "size": [1920, 1080],
+          "unit": "px",
+          "dpi": 96,
+          "coordinateSystem": {
+            "origin": "top-left",
+            "xAxis": "right",
+            "yAxis": "down"
+          },
+          "background": {
+            "kind": "none"
+          },
+          "padding": {
+            "top": 0,
+            "right": 0,
+            "bottom": 0,
+            "left": 0
+          },
+          "guides": [],
+          "broadcastSafeAreas": [
+            {
+              "id": "safe-area-action",
+              "name": "Action Safe",
+              "insets": [3, 3, 3, 3]
+            },
+            {
+              "id": "safe-area-title",
+              "name": "Title Safe",
+              "insets": [5, 5, 5, 5]
+            }
+          ]
+        },
+        "timebase": {
+          "frameRate": {
+            "numerator": 25,
+            "denominator": 1
+          },
+          "ticksPerSecond": 1000,
+          "timecode": {
+            "nominalFramesPerSecond": 25,
+            "dropFrame": false
+          }
+        },
+        "color": {
+          "workingSpace": {
+            "kind": "named",
+            "space": "srgb"
+          },
+          "compositing": "linear-premultiplied"
+        },
+        "elements": [
+          {
+            "id": "el-top-gradient",
+            "name": "Top Vignette",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 1920,
+                "height": 200
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-top-gradient-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "gradient",
+                    "gradient": {
+                      "stops": [
+                        {
+                          "id": "el-top-gradient-gradient-stop-0",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0, 0, 0],
+                            "alpha": 0.5490196078431373
+                          },
+                          "opacity": 1,
+                          "offset": 0
+                        },
+                        {
+                          "id": "el-top-gradient-gradient-stop-1",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0, 0, 0],
+                            "alpha": 0
+                          },
+                          "opacity": 1,
+                          "offset": 1
+                        }
+                      ],
+                      "coordinateSpace": "object-bounds",
+                      "transform": {
+                        "kind": "affine2d",
+                        "matrix": [1, 0, 0, 1, 0, 0]
+                      },
+                      "spread": "pad",
+                      "interpolation": "srgb",
+                      "kind": "linear",
+                      "start": [1, 0.49999999999999994],
+                      "end": [0, 0.5000000000000001]
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          },
+          {
+            "id": "el-bottom-gradient",
+            "name": "Bottom Vignette",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 1920,
+                "height": 200
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 880]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-bottom-gradient-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "gradient",
+                    "gradient": {
+                      "stops": [
+                        {
+                          "id": "el-bottom-gradient-gradient-stop-0",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0, 0, 0],
+                            "alpha": 0.6509803921568628
+                          },
+                          "opacity": 1,
+                          "offset": 0
+                        },
+                        {
+                          "id": "el-bottom-gradient-gradient-stop-1",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0, 0, 0],
+                            "alpha": 0
+                          },
+                          "opacity": 1,
+                          "offset": 1
+                        }
+                      ],
+                      "coordinateSpace": "object-bounds",
+                      "transform": {
+                        "kind": "affine2d",
+                        "matrix": [1, 0, 0, 1, 0, 0]
+                      },
+                      "spread": "pad",
+                      "interpolation": "srgb",
+                      "kind": "linear",
+                      "start": [0, 0.5],
+                      "end": [1, 0.5]
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          },
+          {
+            "id": "el-scorebug",
+            "name": "Score Bug",
+            "parentId": null,
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 580,
+                "height": 76
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 48, 36]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-scorebug-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.03137254901960784, 0.03137254901960784, 0.09411764705882353],
+                      "alpha": 0.8784313725490196
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": true
+            }
+          },
+          {
+            "id": "el-sb-home-color",
+            "name": "Home Color Bar",
+            "parentId": "el-scorebug",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 5,
+                "height": 76
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-sb-home-color-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.8313725490196079, 0.12941176470588237, 0.23921568627450981],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [6, 0, 0, 6]
+            }
+          },
+          {
+            "id": "el-sb-home-crest",
+            "name": "Home Crest",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 48,
+                "height": 48
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 16, 14]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "image",
+            "image": {
+              "assetId": "asset-home-crest",
+              "fit": "contain"
+            }
+          },
+          {
+            "id": "el-sb-home-abbr",
+            "name": "Home Abbr",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 64,
+                "height": 44
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 74, 16]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-sb-home-abbr-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-sb-home-abbr-run",
+                      "text": "NCF",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 22,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-sb-home-score",
+            "name": "Home Score",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 64,
+                "height": 64
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 148, 6]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-sb-home-score-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-sb-home-score-run",
+                      "text": "2",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 44,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-sb-divider",
+            "name": "Score Divider",
+            "parentId": "el-scorebug",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 2,
+                "height": 40
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 222, 18]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-sb-divider-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [1, 1, 1],
+                      "alpha": 0.12156862745098039
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [1, 1, 1, 1]
+            }
+          },
+          {
+            "id": "el-sb-away-score",
+            "name": "Away Score",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 64,
+                "height": 64
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 234, 6]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-sb-away-score-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-sb-away-score-run",
+                      "text": "1",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 44,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-sb-away-abbr",
+            "name": "Away Abbr",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 64,
+                "height": 44
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 308, 16]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-sb-away-abbr-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-sb-away-abbr-run",
+                      "text": "HBU",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 22,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-sb-away-crest",
+            "name": "Away Crest",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 48,
+                "height": 48
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 382, 14]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "image",
+            "image": {
+              "assetId": "asset-away-crest",
+              "fit": "contain"
+            }
+          },
+          {
+            "id": "el-sb-away-color",
+            "name": "Away Color Bar",
+            "parentId": "el-scorebug",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 5,
+                "height": 76
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 440, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-sb-away-color-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.10196078431372549, 0.36470588235294116, 0.7098039215686275],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          },
+          {
+            "id": "el-sb-time-bg",
+            "name": "Time Panel",
+            "parentId": "el-scorebug",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 124,
+                "height": 76
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 456, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-sb-time-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "gradient",
+                    "gradient": {
+                      "stops": [
+                        {
+                          "id": "el-sb-time-bg-gradient-stop-0",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0.10196078431372549, 0.10196078431372549, 0.24313725490196078],
+                            "alpha": 1
+                          },
+                          "opacity": 1,
+                          "offset": 0
+                        },
+                        {
+                          "id": "el-sb-time-bg-gradient-stop-1",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0.054901960784313725, 0.054901960784313725, 0.1568627450980392],
+                            "alpha": 1
+                          },
+                          "opacity": 1,
+                          "offset": 1
+                        }
+                      ],
+                      "coordinateSpace": "object-bounds",
+                      "transform": {
+                        "kind": "affine2d",
+                        "matrix": [1, 0, 0, 1, 0, 0]
+                      },
+                      "spread": "pad",
+                      "interpolation": "srgb",
+                      "kind": "linear",
+                      "start": [1, 0.49999999999999994],
+                      "end": [0, 0.5000000000000001]
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 6, 6, 0]
+            }
+          },
+          {
+            "id": "el-sb-clock",
+            "name": "Match Clock",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 124,
+                "height": 40
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 456, 6]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "clock",
+            "clock": {
+              "format": "mm:ss",
+              "timeZone": "UTC",
+              "locale": "en-GB"
+            }
+          },
+          {
+            "id": "el-sb-half-label",
+            "name": "Half Label",
+            "parentId": "el-scorebug",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 124,
+                "height": 22
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 456, 48]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-sb-half-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-sb-half-label-run",
+                      "text": "2ND HALF",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 10,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.45098039215686275
+                        },
+                        "weight": 600,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-live-badge-bg",
+            "name": "LIVE Badge",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 78,
+                "height": 28
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 48, 120]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-live-badge-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.8313725490196079, 0.12941176470588237, 0.23921568627450981],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": false
+            }
+          },
+          {
+            "id": "el-live-dot",
+            "name": "Live Dot",
+            "parentId": "el-live-badge-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 10,
+                "height": 10
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 10, 9]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-live-dot-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [1, 1, 1],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "ellipse"
+            }
+          },
+          {
+            "id": "el-live-text",
+            "name": "LIVE Text",
+            "parentId": "el-live-badge-bg",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 48,
+                "height": 24
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 26, 2]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-live-text-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-live-text-run",
+                      "text": "LIVE",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 13,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-event-tag-bg",
+            "name": "Event Tag",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 220,
+                "height": 32
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 48, 156]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-event-tag-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.03137254901960784, 0.03137254901960784, 0.09411764705882353],
+                      "alpha": 0.7490196078431373
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": false
+            }
+          },
+          {
+            "id": "el-event-icon",
+            "name": "Goal Icon",
+            "parentId": "el-event-tag-bg",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 20,
+                "height": 20
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 8, 6]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          },
+          {
+            "id": "el-event-label",
+            "name": "Event Label",
+            "parentId": "el-event-tag-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 180,
+                "height": 24
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 34, 4]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-event-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-event-label-run",
+                      "text": "GOAL · Rivera 62'",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 13,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 0.8156862745098039, 0.1411764705882353],
+                          "alpha": 1
+                        },
+                        "weight": 600,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-network-bug",
+            "name": "Network Bug",
+            "parentId": null,
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 72,
+                "height": 72
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 1808, 36]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 0.7,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "image",
+            "image": {
+              "assetId": "asset-network-bug",
+              "fit": "contain"
+            }
+          },
+          {
+            "id": "el-l3-bg",
+            "name": "Lower Third",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 640,
+                "height": 148
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 48, 828]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-l3-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.03137254901960784, 0.03137254901960784, 0.09411764705882353],
+                      "alpha": 0.9215686274509803
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": false
+            }
+          },
+          {
+            "id": "el-l3-accent",
+            "name": "L3 Accent",
+            "parentId": "el-l3-bg",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 4,
+                "height": 148
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-l3-accent-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "gradient",
+                    "gradient": {
+                      "stops": [
+                        {
+                          "id": "el-l3-accent-gradient-stop-0",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0.8313725490196079, 0.12941176470588237, 0.23921568627450981],
+                            "alpha": 1
+                          },
+                          "opacity": 1,
+                          "offset": 0
+                        },
+                        {
+                          "id": "el-l3-accent-gradient-stop-1",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [1, 0.4196078431372549, 0.20784313725490197],
+                            "alpha": 1
+                          },
+                          "opacity": 1,
+                          "offset": 1
+                        }
+                      ],
+                      "coordinateSpace": "object-bounds",
+                      "transform": {
+                        "kind": "affine2d",
+                        "matrix": [1, 0, 0, 1, 0, 0]
+                      },
+                      "spread": "pad",
+                      "interpolation": "srgb",
+                      "kind": "linear",
+                      "start": [1, 0.49999999999999994],
+                      "end": [0, 0.5000000000000001]
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [6, 0, 0, 6]
+            }
+          },
+          {
+            "id": "el-l3-headshot",
+            "name": "Player Headshot",
+            "parentId": "el-l3-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 116,
+                "height": 116
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 20, 16]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "image",
+            "image": {
+              "assetId": "asset-player-headshot",
+              "fit": "cover"
+            }
+          },
+          {
+            "id": "el-l3-name",
+            "name": "Player Name",
+            "parentId": "el-l3-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 460,
+                "height": 42
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 152, 24]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-l3-name-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-l3-name-run",
+                      "text": "Carlos Rivera",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 32,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-l3-role",
+            "name": "Player Role",
+            "parentId": "el-l3-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 460,
+                "height": 28
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 152, 72]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-l3-role-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-l3-role-run",
+                      "text": "Midfielder · #10",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 17,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.5490196078431373
+                        },
+                        "weight": 500,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-l3-stat-divider",
+            "name": "Stat Line",
+            "parentId": "el-l3-bg",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 460,
+                "height": 1
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 152, 108]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-l3-stat-divider-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [1, 1, 1],
+                      "alpha": 0.058823529411764705
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          },
+          {
+            "id": "el-l3-stat",
+            "name": "Player Stat",
+            "parentId": "el-l3-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 460,
+                "height": 24
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 152, 116]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-l3-stat-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-l3-stat-run",
+                      "text": "23 Goals · 12 Assists · 89% Pass Accuracy",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 13,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.34901960784313724
+                        },
+                        "weight": 600,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-stats-bg",
+            "name": "Stats Panel",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 560,
+                "height": 280
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 1232, 36]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-stats-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.03137254901960784, 0.03137254901960784, 0.09411764705882353],
+                      "alpha": 0.9215686274509803
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": true
+            }
+          },
+          {
+            "id": "el-stats-title",
+            "name": "Stats Title",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 512,
+                "height": 28
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 20]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-stats-title-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-stats-title-run",
+                      "text": "MATCH STATISTICS",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 12,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.4
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-stats-possession-bar",
+            "name": "Possession Bar Home",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 302,
+                "height": 6
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 68]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-stats-possession-bar-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.8313725490196079, 0.12941176470588237, 0.23921568627450981],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [3, 3, 3, 3]
+            }
+          },
+          {
+            "id": "el-stats-possession-bar-away",
+            "name": "Possession Bar Away",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 202,
+                "height": 6
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 334, 68]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-stats-possession-bar-away-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.10196078431372549, 0.36470588235294116, 0.7098039215686275],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [3, 3, 3, 3]
+            }
+          },
+          {
+            "id": "el-stats-possession-label",
+            "name": "Possession",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 512,
+                "height": 22
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 80]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-stats-possession-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-stats-possession-label-run",
+                      "text": "59%   POSSESSION   41%",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 12,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.5019607843137255
+                        },
+                        "weight": 600,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-stats-shots-label",
+            "name": "Shots",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 512,
+                "height": 32
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 118]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-stats-shots-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-stats-shots-label-run",
+                      "text": "14     Shots     8",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 16,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.7019607843137254
+                        },
+                        "weight": 400,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-stats-ontarget-label",
+            "name": "On Target",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 512,
+                "height": 32
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 158]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-stats-ontarget-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-stats-ontarget-label-run",
+                      "text": "7     On Target     3",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 16,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.7019607843137254
+                        },
+                        "weight": 400,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-stats-corners-label",
+            "name": "Corners",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 512,
+                "height": 32
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 198]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-stats-corners-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-stats-corners-label-run",
+                      "text": "6     Corners     4",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 16,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.7019607843137254
+                        },
+                        "weight": 400,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-stats-fouls-label",
+            "name": "Fouls",
+            "parentId": "el-stats-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 512,
+                "height": 32
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 24, 238]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-stats-fouls-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-stats-fouls-label-run",
+                      "text": "9     Fouls     12",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 16,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.7019607843137254
+                        },
+                        "weight": 400,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-replay-window",
+            "name": "Replay Window",
+            "parentId": null,
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 640,
+                "height": 360
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 1232, 524]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": false
+            }
+          },
+          {
+            "id": "el-replay-label",
+            "name": "Replay Label",
+            "parentId": "el-replay-window",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 100,
+                "height": 24
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 12, 12]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-replay-label-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0, 0, 0],
+                      "alpha": 0.45098039215686275
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-replay-label-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-replay-label-run",
+                      "text": "REPLAY",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 11,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.8
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-promo-bg",
+            "name": "Sponsor Panel",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 240,
+                "height": 140
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 1632, 900]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-promo-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.03137254901960784, 0.03137254901960784, 0.09411764705882353],
+                      "alpha": 0.9215686274509803
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": true
+            }
+          },
+          {
+            "id": "el-promo-qr",
+            "name": "Sponsor QR",
+            "parentId": "el-promo-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 108,
+                "height": 108
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 16, 16]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-promo-qr-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [1, 1, 1],
+                      "alpha": 1
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "qrcode",
+            "qrcode": {
+              "value": "https://broadset.dev/live",
+              "errorCorrection": "M",
+              "quietZone": 4
+            }
+          },
+          {
+            "id": "el-promo-cta",
+            "name": "Sponsor CTA",
+            "parentId": "el-promo-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 92,
+                "height": 92
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 136, 24]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-promo-cta-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-promo-cta-run",
+                      "text": "SCAN FORLIVESTATS",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 13,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 0.7019607843137254
+                        },
+                        "weight": 500,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-ticker-bg",
+            "name": "Ticker Bar",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 1920,
+                "height": 40
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 1040]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-ticker-bg-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.03137254901960784, 0.03137254901960784, 0.09411764705882353],
+                      "alpha": 0.9411764705882353
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "group",
+            "group": {
+              "clipChildren": true
+            }
+          },
+          {
+            "id": "el-ticker-tag",
+            "name": "Ticker Tag BG",
+            "parentId": "el-ticker-bg",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 160,
+                "height": 40
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [
+                {
+                  "id": "el-ticker-tag-fill",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "gradient",
+                    "gradient": {
+                      "stops": [
+                        {
+                          "id": "el-ticker-tag-gradient-stop-0",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0.8313725490196079, 0.12941176470588237, 0.23921568627450981],
+                            "alpha": 1
+                          },
+                          "opacity": 1,
+                          "offset": 0
+                        },
+                        {
+                          "id": "el-ticker-tag-gradient-stop-1",
+                          "color": {
+                            "kind": "color",
+                            "space": "srgb",
+                            "channels": [0.6274509803921569, 0.09411764705882353, 0.18823529411764706],
+                            "alpha": 1
+                          },
+                          "opacity": 1,
+                          "offset": 1
+                        }
+                      ],
+                      "coordinateSpace": "object-bounds",
+                      "transform": {
+                        "kind": "affine2d",
+                        "matrix": [1, 0, 0, 1, 0, 0]
+                      },
+                      "spread": "pad",
+                      "interpolation": "srgb",
+                      "kind": "linear",
+                      "start": [0.49999999999999994, 0],
+                      "end": [0.5, 1]
+                    }
+                  }
+                }
+              ],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          },
+          {
+            "id": "el-ticker-tag-text",
+            "name": "Ticker Tag Label",
+            "parentId": "el-ticker-bg",
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 160,
+                "height": 40
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 0, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "text",
+            "text": {
+              "paragraphs": [
+                {
+                  "id": "el-ticker-tag-text-paragraph",
+                  "properties": {
+                    "alignment": "start",
+                    "direction": "ltr",
+                    "lineSpacing": {
+                      "kind": "normal"
+                    },
+                    "spaceBefore": 0,
+                    "spaceAfter": 0,
+                    "firstLineIndent": 0,
+                    "startIndent": 0,
+                    "endIndent": 0,
+                    "tabs": [],
+                    "list": {
+                      "kind": "none"
+                    },
+                    "hyphenation": "none",
+                    "keepTogether": false,
+                    "keepWithNext": false,
+                    "widowControl": true
+                  },
+                  "runs": [
+                    {
+                      "id": "el-ticker-tag-text-run",
+                      "text": "BREAKING",
+                      "properties": {
+                        "fontFamilyId": "font-family-inter",
+                        "fontFaceId": "font-face-inter-regular",
+                        "size": 13,
+                        "color": {
+                          "kind": "color",
+                          "space": "srgb",
+                          "channels": [1, 1, 1],
+                          "alpha": 1
+                        },
+                        "weight": 700,
+                        "variationAxes": [],
+                        "openTypeFeatures": [],
+                        "language": "en",
+                        "script": "Latn",
+                        "direction": "ltr",
+                        "decoration": {
+                          "underline": false,
+                          "strikeThrough": false,
+                          "style": "solid"
+                        },
+                        "baselineShift": 0,
+                        "tracking": 0,
+                        "semanticRole": "none"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "layout": {
+              "verticalAlignment": "middle",
+              "overflow": "visible",
+              "autoSize": "none",
+              "columns": 1,
+              "columnGap": 0
+            }
+          },
+          {
+            "id": "el-ticker-scroll",
+            "name": "News Ticker",
+            "parentId": "el-ticker-bg",
+            "locked": false,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 1752,
+                "height": 40
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 168, 0]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "ticker",
+            "ticker": {
+              "items": [
+                {
+                  "id": "el-ticker-scroll-item-0",
+                  "text": "NORTH CITY FC 2 — 1 HARBOR UNITED  ·  Rivera 45' (pen), Okafor 62'  ·  Martins 38'"
+                },
+                {
+                  "id": "el-ticker-scroll-item-1",
+                  "text": "SOUTH METRO 0 — 0 RIVER VALE  ·  Half-Time  ·  Weather delay possible"
+                },
+                {
+                  "id": "el-ticker-scroll-item-2",
+                  "text": "BREAKING: Diallo completes £48m move to East Borough — signs 4-year deal"
+                },
+                {
+                  "id": "el-ticker-scroll-item-3",
+                  "text": "COMING UP: Post-match analysis with Gary Lineker at 22:00 on BCS Sport"
+                },
+                {
+                  "id": "el-ticker-scroll-item-4",
+                  "text": "TABLE UPDATE: North City move to 2nd — level on points with leaders Coastline Athletic"
+                }
+              ],
+              "direction": "left",
+              "speed": 70,
+              "gap": 80,
+              "repeat": true
+            }
+          },
+          {
+            "id": "el-top-rule",
+            "name": "Top Accent Rule",
+            "parentId": null,
+            "locked": true,
+            "hiddenInEditor": false,
+            "geometry": {
+              "bounds": {
+                "width": 560,
+                "height": 2
+              },
+              "transform": {
+                "kind": "affine2d",
+                "matrix": [1, 0, 0, 1, 48, 200]
+              },
+              "origin": [0, 0, 0]
+            },
+            "appearance": {
+              "opacity": 1,
+              "blendMode": "normal",
+              "isolation": false,
+              "fills": [],
+              "strokes": [
+                {
+                  "id": "el-top-rule-stroke",
+                  "enabled": true,
+                  "opacity": 1,
+                  "blendMode": "normal",
+                  "paint": {
+                    "kind": "solid",
+                    "color": {
+                      "kind": "color",
+                      "space": "srgb",
+                      "channels": [0.8313725490196079, 0.12941176470588237, 0.23921568627450981],
+                      "alpha": 0.14901960784313725
+                    }
+                  },
+                  "width": 1,
+                  "alignment": "center",
+                  "cap": "round",
+                  "join": "miter",
+                  "miterLimit": 4,
+                  "dash": [],
+                  "dashOffset": 0
+                }
+              ],
+              "effects": []
+            },
+            "sharedStyleIds": [],
+            "extensions": [],
+            "kind": "vector",
+            "geometryData": {
+              "kind": "rectangle",
+              "cornerRadii": [0, 0, 0, 0]
+            }
+          }
+        ],
+        "components": [],
+        "pages": [
+          {
+            "id": "page-match-live",
+            "name": "Match — Live",
+            "locale": "en-GB",
+            "rootInstances": [
+              {
+                "id": "page-match-live-el-top-gradient",
+                "elementId": "el-top-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-bottom-gradient",
+                "elementId": "el-bottom-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-scorebug",
+                "elementId": "el-scorebug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-live-badge-bg",
+                "elementId": "el-live-badge-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-event-tag-bg",
+                "elementId": "el-event-tag-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-network-bug",
+                "elementId": "el-network-bug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-l3-bg",
+                "elementId": "el-l3-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-stats-bg",
+                "elementId": "el-stats-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-replay-window",
+                "elementId": "el-replay-window",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-promo-bg",
+                "elementId": "el-promo-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-ticker-bg",
+                "elementId": "el-ticker-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-live-el-top-rule",
+                "elementId": "el-top-rule",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              }
+            ],
+            "descendantOverrides": [],
+            "selectedVariableModes": {},
+            "selectedSampleDataSets": {},
+            "extensions": []
+          },
+          {
+            "id": "page-match-player",
+            "name": "Match — Player Card",
+            "locale": "en-GB",
+            "rootInstances": [
+              {
+                "id": "page-match-player-el-top-gradient",
+                "elementId": "el-top-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-bottom-gradient",
+                "elementId": "el-bottom-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-scorebug",
+                "elementId": "el-scorebug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-live-badge-bg",
+                "elementId": "el-live-badge-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-event-tag-bg",
+                "elementId": "el-event-tag-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-network-bug",
+                "elementId": "el-network-bug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-l3-bg",
+                "elementId": "el-l3-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-stats-bg",
+                "elementId": "el-stats-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-replay-window",
+                "elementId": "el-replay-window",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-promo-bg",
+                "elementId": "el-promo-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-ticker-bg",
+                "elementId": "el-ticker-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-player-el-top-rule",
+                "elementId": "el-top-rule",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              }
+            ],
+            "descendantOverrides": [],
+            "selectedVariableModes": {},
+            "selectedSampleDataSets": {},
+            "extensions": []
+          },
+          {
+            "id": "page-match-stats",
+            "name": "Match — Statistics",
+            "locale": "en-GB",
+            "rootInstances": [
+              {
+                "id": "page-match-stats-el-top-gradient",
+                "elementId": "el-top-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-bottom-gradient",
+                "elementId": "el-bottom-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-scorebug",
+                "elementId": "el-scorebug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-live-badge-bg",
+                "elementId": "el-live-badge-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-event-tag-bg",
+                "elementId": "el-event-tag-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-network-bug",
+                "elementId": "el-network-bug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-l3-bg",
+                "elementId": "el-l3-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-stats-bg",
+                "elementId": "el-stats-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-replay-window",
+                "elementId": "el-replay-window",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-promo-bg",
+                "elementId": "el-promo-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-ticker-bg",
+                "elementId": "el-ticker-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-match-stats-el-top-rule",
+                "elementId": "el-top-rule",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              }
+            ],
+            "descendantOverrides": [],
+            "selectedVariableModes": {},
+            "selectedSampleDataSets": {},
+            "extensions": []
+          },
+          {
+            "id": "page-replay",
+            "name": "Replay",
+            "locale": "en-GB",
+            "rootInstances": [
+              {
+                "id": "page-replay-el-top-gradient",
+                "elementId": "el-top-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-bottom-gradient",
+                "elementId": "el-bottom-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-scorebug",
+                "elementId": "el-scorebug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-live-badge-bg",
+                "elementId": "el-live-badge-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-event-tag-bg",
+                "elementId": "el-event-tag-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-network-bug",
+                "elementId": "el-network-bug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-l3-bg",
+                "elementId": "el-l3-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-stats-bg",
+                "elementId": "el-stats-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-replay-window",
+                "elementId": "el-replay-window",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-promo-bg",
+                "elementId": "el-promo-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-ticker-bg",
+                "elementId": "el-ticker-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-replay-el-top-rule",
+                "elementId": "el-top-rule",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              }
+            ],
+            "descendantOverrides": [],
+            "selectedVariableModes": {},
+            "selectedSampleDataSets": {},
+            "extensions": []
+          },
+          {
+            "id": "page-halftime",
+            "name": "Half-Time",
+            "locale": "en-GB",
+            "rootInstances": [
+              {
+                "id": "page-halftime-el-top-gradient",
+                "elementId": "el-top-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-bottom-gradient",
+                "elementId": "el-bottom-gradient",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-scorebug",
+                "elementId": "el-scorebug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-live-badge-bg",
+                "elementId": "el-live-badge-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-event-tag-bg",
+                "elementId": "el-event-tag-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-network-bug",
+                "elementId": "el-network-bug",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-l3-bg",
+                "elementId": "el-l3-bg",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-stats-bg",
+                "elementId": "el-stats-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-replay-window",
+                "elementId": "el-replay-window",
+                "visible": false,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-promo-bg",
+                "elementId": "el-promo-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-ticker-bg",
+                "elementId": "el-ticker-bg",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              },
+              {
+                "id": "page-halftime-el-top-rule",
+                "elementId": "el-top-rule",
+                "visible": true,
+                "overrides": [],
+                "componentPropertyValues": []
+              }
+            ],
+            "descendantOverrides": [],
+            "selectedVariableModes": {},
+            "selectedSampleDataSets": {},
+            "extensions": []
+          }
+        ],
+        "sequences": [
+          {
+            "id": "tl-live-pulse",
+            "name": "Live Pulse",
+            "durationTicks": 800,
+            "loop": {
+              "kind": "ping-pong",
+              "gapTicks": 0,
+              "endpoint": "once"
+            },
+            "tracks": [
+              {
+                "id": "tl-live-pulse-el-live-dot-opacity",
+                "name": "Live Pulse opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-live-dot"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-live-pulse-el-live-dot-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0.42, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-live-pulse-el-live-dot-opacity-1",
+                    "tick": 800,
+                    "value": {
+                      "type": "number",
+                      "value": 0.15
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-sb-in",
+            "name": "Score Bug In",
+            "durationTicks": 600,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-sb-in-el-scorebug-opacity",
+                "name": "Score Bug In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-scorebug"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-sb-in-el-scorebug-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-sb-in-el-scorebug-opacity-1",
+                    "tick": 600,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-sb-in-el-scorebug-translateX",
+                "name": "Score Bug In translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-scorebug"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-sb-in-el-scorebug-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": -40
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-sb-in-el-scorebug-translateX-1",
+                    "tick": 600,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-sb-out",
+            "name": "Score Bug Out",
+            "durationTicks": 400,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-sb-out-el-scorebug-opacity",
+                "name": "Score Bug Out opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-scorebug"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-sb-out-el-scorebug-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-sb-out-el-scorebug-opacity-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-sb-out-el-scorebug-translateX",
+                "name": "Score Bug Out translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-scorebug"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-sb-out-el-scorebug-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0.42, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-sb-out-el-scorebug-translateX-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "length",
+                      "value": -40
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-l3-in",
+            "name": "Lower Third In",
+            "durationTicks": 700,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-l3-in-el-l3-bg-opacity",
+                "name": "Lower Third In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-in-el-l3-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-in-el-l3-bg-opacity-1",
+                    "tick": 700,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-l3-in-el-l3-bg-translateX",
+                "name": "Lower Third In translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-in-el-l3-bg-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": -60
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-in-el-l3-bg-translateX-1",
+                    "tick": 700,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-l3-headshot-in",
+            "name": "Headshot In",
+            "durationTicks": 400,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-l3-headshot-in-el-l3-headshot-opacity",
+                "name": "Headshot In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-headshot"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-headshot-in-el-l3-headshot-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-headshot-in-el-l3-headshot-opacity-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-l3-headshot-in-el-l3-headshot-scale",
+                "name": "Headshot In scale",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-headshot"
+                  },
+                  "pointer": "/geometry/transform/matrix/0"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-headshot-in-el-l3-headshot-scale-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0.85
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-headshot-in-el-l3-headshot-scale-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-l3-name-in",
+            "name": "Name In",
+            "durationTicks": 450,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-l3-name-in-el-l3-name-opacity",
+                "name": "Name In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-name"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-name-in-el-l3-name-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-name-in-el-l3-name-opacity-1",
+                    "tick": 450,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-l3-name-in-el-l3-name-translateX",
+                "name": "Name In translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-name"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-name-in-el-l3-name-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": -20
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-name-in-el-l3-name-translateX-1",
+                    "tick": 450,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-l3-role-in",
+            "name": "Role In",
+            "durationTicks": 400,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-l3-role-in-el-l3-role-opacity",
+                "name": "Role In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-role"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-role-in-el-l3-role-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-role-in-el-l3-role-opacity-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-l3-role-in-el-l3-role-translateX",
+                "name": "Role In translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-role"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-role-in-el-l3-role-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": -16
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-role-in-el-l3-role-translateX-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-l3-stat-in",
+            "name": "Stat In",
+            "durationTicks": 350,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-l3-stat-in-el-l3-stat-opacity",
+                "name": "Stat In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-stat"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-stat-in-el-l3-stat-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-stat-in-el-l3-stat-opacity-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-l3-stat-in-el-l3-stat-translateX",
+                "name": "Stat In translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-stat"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-stat-in-el-l3-stat-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": -12
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-stat-in-el-l3-stat-translateX-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-l3-out",
+            "name": "Lower Third Out",
+            "durationTicks": 400,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-l3-out-el-l3-bg-opacity",
+                "name": "Lower Third Out opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-out-el-l3-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-out-el-l3-bg-opacity-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-l3-out-el-l3-bg-translateX",
+                "name": "Lower Third Out translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-l3-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-l3-out-el-l3-bg-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0.42, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-l3-out-el-l3-bg-translateX-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "length",
+                      "value": -60
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-stats-in",
+            "name": "Stats In",
+            "durationTicks": 500,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-stats-in-el-stats-bg-opacity",
+                "name": "Stats In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-stats-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-stats-in-el-stats-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-stats-in-el-stats-bg-opacity-1",
+                    "tick": 500,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-stats-in-el-stats-bg-translateY",
+                "name": "Stats In translateY",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-stats-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/5"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-stats-in-el-stats-bg-translateY-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 24
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-stats-in-el-stats-bg-translateY-1",
+                    "tick": 500,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-stats-out",
+            "name": "Stats Out",
+            "durationTicks": 350,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-stats-out-el-stats-bg-opacity",
+                "name": "Stats Out opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-stats-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-stats-out-el-stats-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-stats-out-el-stats-bg-opacity-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-stats-out-el-stats-bg-translateY",
+                "name": "Stats Out translateY",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-stats-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/5"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-stats-out-el-stats-bg-translateY-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0.42, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-stats-out-el-stats-bg-translateY-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "length",
+                      "value": 24
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-promo-in",
+            "name": "Sponsor In",
+            "durationTicks": 500,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-promo-in-el-promo-bg-opacity",
+                "name": "Sponsor In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-promo-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-promo-in-el-promo-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-promo-in-el-promo-bg-opacity-1",
+                    "tick": 500,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-promo-in-el-promo-bg-translateX",
+                "name": "Sponsor In translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-promo-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-promo-in-el-promo-bg-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 30
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-promo-in-el-promo-bg-translateX-1",
+                    "tick": 500,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-promo-out",
+            "name": "Sponsor Out",
+            "durationTicks": 350,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-promo-out-el-promo-bg-opacity",
+                "name": "Sponsor Out opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-promo-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-promo-out-el-promo-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-promo-out-el-promo-bg-opacity-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-promo-out-el-promo-bg-translateX",
+                "name": "Sponsor Out translateX",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-promo-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/4"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-promo-out-el-promo-bg-translateX-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0.42, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-promo-out-el-promo-bg-translateX-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "length",
+                      "value": 30
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-ticker-in",
+            "name": "Ticker In",
+            "durationTicks": 400,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-ticker-in-el-ticker-bg-opacity",
+                "name": "Ticker In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-ticker-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-ticker-in-el-ticker-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-ticker-in-el-ticker-bg-opacity-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-ticker-in-el-ticker-bg-translateY",
+                "name": "Ticker In translateY",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-ticker-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/5"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-ticker-in-el-ticker-bg-translateY-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 40
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-ticker-in-el-ticker-bg-translateY-1",
+                    "tick": 400,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-ticker-out",
+            "name": "Ticker Out",
+            "durationTicks": 300,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-ticker-out-el-ticker-bg-opacity",
+                "name": "Ticker Out opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-ticker-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-ticker-out-el-ticker-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-ticker-out-el-ticker-bg-opacity-1",
+                    "tick": 300,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-ticker-out-el-ticker-bg-translateY",
+                "name": "Ticker Out translateY",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-ticker-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/5"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-ticker-out-el-ticker-bg-translateY-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0.42, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-ticker-out-el-ticker-bg-translateY-1",
+                    "tick": 300,
+                    "value": {
+                      "type": "length",
+                      "value": 40
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-event-in",
+            "name": "Event Flash In",
+            "durationTicks": 350,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-event-in-el-event-tag-bg-opacity",
+                "name": "Event Flash In opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-event-tag-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-event-in-el-event-tag-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-event-in-el-event-tag-bg-opacity-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "tl-event-in-el-event-tag-bg-translateY",
+                "name": "Event Flash In translateY",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-event-tag-bg"
+                  },
+                  "pointer": "/geometry/transform/matrix/5"
+                },
+                "valueType": "length",
+                "keyframes": [
+                  {
+                    "id": "tl-event-in-el-event-tag-bg-translateY-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "length",
+                      "value": -6
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 0.58, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-event-in-el-event-tag-bg-translateY-1",
+                    "tick": 350,
+                    "value": {
+                      "type": "length",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          },
+          {
+            "id": "tl-event-out",
+            "name": "Event Flash Out",
+            "durationTicks": 300,
+            "loop": {
+              "kind": "none"
+            },
+            "tracks": [
+              {
+                "id": "tl-event-out-el-event-tag-bg-opacity",
+                "name": "Event Flash Out opacity",
+                "target": {
+                  "entity": {
+                    "projectId": "proj-broadcast-demo",
+                    "documentId": "doc-broadcast-main",
+                    "entityKind": "element",
+                    "entityId": "el-event-tag-bg"
+                  },
+                  "pointer": "/appearance/opacity"
+                },
+                "valueType": "number",
+                "keyframes": [
+                  {
+                    "id": "tl-event-out-el-event-tag-bg-opacity-0",
+                    "tick": 0,
+                    "value": {
+                      "type": "number",
+                      "value": 1
+                    },
+                    "interpolation": {
+                      "kind": "cubic-bezier",
+                      "controlPoints": [0, 0, 1, 1]
+                    }
+                  },
+                  {
+                    "id": "tl-event-out-el-event-tag-bg-opacity-1",
+                    "tick": 300,
+                    "value": {
+                      "type": "number",
+                      "value": 0
+                    }
+                  }
+                ]
+              }
+            ],
+            "markers": [],
+            "cues": [],
+            "childClips": []
+          }
+        ],
+        "stateMachines": [],
+        "viewModels": [
+          {
+            "id": "demo-live-data",
+            "name": "Live Broadcast Data",
+            "fields": [
+              {
+                "id": "field-homeAbbr",
+                "name": "homeAbbr",
+                "label": "Home Abbreviation",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "NCF"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-awayAbbr",
+                "name": "awayAbbr",
+                "label": "Away Abbreviation",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "HBU"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-homeScore",
+                "name": "homeScore",
+                "label": "Home Score",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "2"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-awayScore",
+                "name": "awayScore",
+                "label": "Away Score",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "1"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-matchPeriod",
+                "name": "matchPeriod",
+                "label": "Match Period",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "2ND HALF"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-lastEvent",
+                "name": "lastEvent",
+                "label": "Last Event",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "GOAL · Rivera 62'"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-playerName",
+                "name": "playerName",
+                "label": "Player Name",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "Carlos Rivera"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-playerRole",
+                "name": "playerRole",
+                "label": "Player Role",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "Midfielder · #10"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-playerStat",
+                "name": "playerStat",
+                "label": "Player Stats",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "23 Goals · 12 Assists · 89% Pass Accuracy"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-sponsorUrl",
+                "name": "sponsorUrl",
+                "label": "Sponsor QR URL",
+                "schema": {
+                  "kind": "string"
+                },
+                "defaultValue": {
+                  "type": "string",
+                  "value": "https://broadset.dev/live"
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-showBranding",
+                "name": "showBranding",
+                "label": "Show Network Bug",
+                "schema": {
+                  "kind": "boolean"
+                },
+                "defaultValue": {
+                  "type": "boolean",
+                  "value": true
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-showStats",
+                "name": "showStats",
+                "label": "Show Stats Panel",
+                "schema": {
+                  "kind": "boolean"
+                },
+                "defaultValue": {
+                  "type": "boolean",
+                  "value": true
+                },
+                "stalePolicy": "use-default"
+              },
+              {
+                "id": "field-showSponsor",
+                "name": "showSponsor",
+                "label": "Show Sponsor Panel",
+                "schema": {
+                  "kind": "boolean"
+                },
+                "defaultValue": {
+                  "type": "boolean",
+                  "value": true
+                },
+                "stalePolicy": "use-default"
+              }
+            ],
+            "sampleDataSets": [
+              {
+                "id": "demo-live-data-defaults",
+                "name": "Match Defaults",
+                "values": {
+                  "field-homeAbbr": {
+                    "type": "string",
+                    "value": "NCF"
+                  },
+                  "field-awayAbbr": {
+                    "type": "string",
+                    "value": "HBU"
+                  },
+                  "field-homeScore": {
+                    "type": "string",
+                    "value": "2"
+                  },
+                  "field-awayScore": {
+                    "type": "string",
+                    "value": "1"
+                  },
+                  "field-matchPeriod": {
+                    "type": "string",
+                    "value": "2ND HALF"
+                  },
+                  "field-lastEvent": {
+                    "type": "string",
+                    "value": "GOAL · Rivera 62'"
+                  },
+                  "field-playerName": {
+                    "type": "string",
+                    "value": "Carlos Rivera"
+                  },
+                  "field-playerRole": {
+                    "type": "string",
+                    "value": "Midfielder · #10"
+                  },
+                  "field-playerStat": {
+                    "type": "string",
+                    "value": "23 Goals · 12 Assists · 89% Pass Accuracy"
+                  },
+                  "field-sponsorUrl": {
+                    "type": "string",
+                    "value": "https://broadset.dev/live"
+                  },
+                  "field-showBranding": {
+                    "type": "boolean",
+                    "value": true
+                  },
+                  "field-showStats": {
+                    "type": "boolean",
+                    "value": true
+                  },
+                  "field-showSponsor": {
+                    "type": "boolean",
+                    "value": true
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "bindings": [
+          {
+            "id": "binding-el-sb-home-abbr-field-homeAbbr",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-sb-home-abbr-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-homeAbbr"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "NCF"
+            }
+          },
+          {
+            "id": "binding-el-sb-home-score-field-homeScore",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-sb-home-score-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-homeScore"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "2"
+            }
+          },
+          {
+            "id": "binding-el-sb-away-score-field-awayScore",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-sb-away-score-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-awayScore"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "1"
+            }
+          },
+          {
+            "id": "binding-el-sb-away-abbr-field-awayAbbr",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-sb-away-abbr-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-awayAbbr"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "HBU"
+            }
+          },
+          {
+            "id": "binding-el-sb-half-label-field-matchPeriod",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-sb-half-label-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-matchPeriod"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "2ND HALF"
+            }
+          },
+          {
+            "id": "binding-el-event-label-field-lastEvent",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-event-label-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-lastEvent"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "GOAL · Rivera 62'"
+            }
+          },
+          {
+            "id": "binding-el-l3-name-field-playerName",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-l3-name-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-playerName"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "Carlos Rivera"
+            }
+          },
+          {
+            "id": "binding-el-l3-role-field-playerRole",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-l3-role-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-playerRole"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "Midfielder · #10"
+            }
+          },
+          {
+            "id": "binding-el-l3-stat-field-playerStat",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "text-run",
+                "entityId": "el-l3-stat-run"
+              },
+              "pointer": "/text"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-playerStat"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "23 Goals · 12 Assists · 89% Pass Accuracy"
+            }
+          },
+          {
+            "id": "binding-el-promo-qr-field-sponsorUrl",
+            "target": {
+              "entity": {
+                "projectId": "proj-broadcast-demo",
+                "documentId": "doc-broadcast-main",
+                "entityKind": "element",
+                "entityId": "el-promo-qr"
+              },
+              "pointer": "/qrcode/value"
+            },
+            "expression": {
+              "kind": "field",
+              "viewModelId": "demo-live-data",
+              "fieldId": "field-sponsorUrl"
+            },
+            "fallback": {
+              "type": "string",
+              "value": "https://broadset.dev/live"
+            }
+          }
+        ],
+        "selectedVariableModes": {},
+        "outputProfileIds": [],
+        "extensions": []
+      }
+    ],
+    "templateGroups": [],
+    "interop": {
+      "sources": [],
+      "records": []
+    },
+    "extensions": []
+  }
+}

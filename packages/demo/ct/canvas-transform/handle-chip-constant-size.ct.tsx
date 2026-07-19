@@ -6,20 +6,7 @@ import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 
 async function setCanvasZoom(page: Page, zoom: number): Promise<void> {
   await page.evaluate((nextZoom) => {
-    interface ZoomStoreState {
-      readonly updateCanvasSettings: (settings: {
-        readonly zoom: number;
-        readonly panX: number;
-        readonly panY: number;
-      }) => void;
-    }
-
-    interface ZoomStore {
-      readonly getState: () => ZoomStoreState;
-    }
-
-    const store = (window as unknown as { __broadsetEditorStore?: ZoomStore }).__broadsetEditorStore;
-    const state = store?.getState();
+    const state = window.__broadsetProjectEditorStore?.getState();
 
     if (state === undefined) {
       throw new Error('Expected demo editor store');

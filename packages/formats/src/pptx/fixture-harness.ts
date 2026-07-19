@@ -1,5 +1,7 @@
-import { exportPptxBytes } from './export';
-import { importPptxWithReport, type PptxImportReport } from './import';
+import { projectFormatV1 } from '@broadset/model';
+
+import { exportPptxBytesV1 } from './v1/export';
+import { importPptxProjectV1 } from './v1/import';
 
 /**
  * @description Shared assertion contract for real-world `.pptx` fixtures.
@@ -28,31 +30,32 @@ interface FixtureAssertionResult {
   readonly reExportedBytes: number;
 }
 
-export function importAndAssert(name: string, bytes: Uint8Array): FixtureAssertionResult {
-  const report: PptxImportReport = importPptxWithReport(bytes);
-  const surfaced = report.document.elements.length > 0 || report.warnings.length > 0;
+export async function importAndAssert(name: string, bytes: Uint8Array): Promise<FixtureAssertionResult> {
+  const importedAt = projectFormatV1.utcTimestampSchema.parse('2026-07-12T00:00:00Z');
+  const report = await importPptxProjectV1({ bytes, fileName: name, importedAt });
+  const elementCount = report.project.documents.reduce((count, document) => count + document.elements.length, 0);
+  const warningCount = report.project.interop.records.reduce((count, record) => count + record.warnings.length, 0);
+  const surfaced = elementCount > 0 || warningCount > 0;
 
   if (!surfaced) {
     throw new Error(`${name}: imported zero elements and zero warnings (silent total drop)`);
   }
 
-  for (const el of report.document.elements) {
-    const ext = el.extensions['pptx'] as { readonly dirty?: boolean } | undefined;
+  const semanticIssues = projectFormatV1.validateBroadsetProjectV1Semantics(report.project);
 
-    if (ext?.dirty !== false) {
-      throw new Error(`${name}: element ${el.id} has extensions.pptx.dirty=${String(ext?.dirty)} (expected false)`);
-    }
+  if (semanticIssues.length > 0) {
+    throw new Error(`${name}: imported project has ${String(semanticIssues.length)} semantic issues`);
   }
 
-  const reExported = exportPptxBytes(report.document);
+  const reExported = await exportPptxBytesV1({ project: report.project, blobs: report.blobs });
 
   if (reExported.byteLength === 0) {
     throw new Error(`${name}: re-export produced zero bytes`);
   }
 
   return {
-    elementCount: report.document.elements.length,
-    warningCount: report.warnings.length,
+    elementCount,
+    warningCount,
     reExportedBytes: reExported.byteLength,
   };
 }

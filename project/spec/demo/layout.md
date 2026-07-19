@@ -87,7 +87,7 @@ The toolbar MUST use a compact height (consistent with `sp-08` token). It MUST u
 
 ### Requirement: Element Toolbar
 
-A vertical element toolbar MUST render below the main toolbar in a single column listing all built-in element types and registered custom plugins. Each button MUST be icon-only with a tooltip and MUST enter placement mode for its type. The active placement type MUST be visually highlighted.
+A vertical authoring-tool toolbar MUST render below the main toolbar with core creation/import tools and registered plugin tools. Friendly Rectangle, Ellipse, and Path buttons create canonical vector subtypes; SVG Import maps to native vectors or safe foreign fallback; plugin buttons create `kind: 'plugin'`. Each icon-only button has a tooltip and visually indicates active placement.
 
 **Visual:**
 
@@ -97,13 +97,13 @@ The element toolbar MUST be a vertical strip of icon buttons positioned directly
 
 - GIVEN the demo app with a custom countdown plugin
 - WHEN the element toolbar renders
-- THEN buttons for text, rectangle, ellipse, image, svg, path, qrcode, group, video, clock, ticker, and countdown are visible
+- THEN buttons for Text, Rectangle, Ellipse, Image, SVG Import, Path, QR Code, Group, Video, Audio, Clock, Ticker, Component Instance, and countdown are visible
 
 #### Scenario: Placement mode activation
 
 - GIVEN no active placement
-- WHEN an element type button is pressed
-- THEN placement mode is entered for that type and the button is highlighted
+- WHEN an authoring-tool button is pressed
+- THEN its canonical placement/import action begins and the button is highlighted where placement applies
 
 #### Acceptance Criteria
 
@@ -262,7 +262,7 @@ The context menu MUST display these actions in order. Actions MUST be enabled or
 | Send to Back     |                | Element selected                           |        |
 | — separator —    |                |                                            |        |
 | Group            | Ctrl+G         | 2+ elements selected                       |        |
-| Ungroup          | Ctrl+Shift+G   | Selected element(s) have a groupId         |        |
+| Ungroup          | Ctrl+Shift+G   | A structural group is selected             |        |
 | — separator —    |                |                                            |        |
 | Lock / Unlock    | Ctrl+L         | Element selected                           |        |
 | Edit Clip Path   |                | Element has `clipPath` capability          |        |
@@ -320,13 +320,13 @@ The context menu MUST display only:
 
 #### Scenario: Edit Clip Path opens clip-path editing
 
-- GIVEN a rectangle element selected
+- GIVEN a vector rectangle selected
 - WHEN the user selects "Edit Clip Path" from the context menu
 - THEN clip-path editing mode is entered for that element
 
 #### Scenario: Edit Path Points opens path editing
 
-- GIVEN a path element selected
+- GIVEN a vector structured path selected
 - WHEN the user selects "Edit Path Points" from the context menu
 - THEN path editing mode is entered for that element
 
@@ -345,7 +345,7 @@ The context menu MUST display only:
 - [ ] Given Ungroup with grouped elements, elements are ungrouped
 - [ ] Given Lock/Unlock, the element's locked state toggles
 - [ ] Given Edit Clip Path on an element with clipPath capability, clip-path editing activates
-- [ ] Given Edit Path Points on a path element, path editing mode activates
+- [ ] Given Edit Path Points on a vector structured path, path editing mode activates
 - [ ] Given Delete item, it renders with danger color (red text)
 - [ ] Given a locked element, Lock/Unlock label shows "Unlock"; given an unlocked element, it shows "Lock"
 - [ ] Given a single element selected, Group and Ungroup are not rendered in the menu
@@ -369,7 +369,7 @@ The Play/Pause and Reset buttons MUST operate on whichever playback context is c
 
 When a timeline is open, the toolbar MUST visibly identify the timeline context and its play state, and the Play/Pause and Reset accessible labels MUST name the timeline rather than using generic document-playback labels. Opening a timeline from this toolbar MUST stop document-level playback so timeline preview and document playback do not silently compete.
 
-The timeline view toggle MUST be disabled when no selected element has any timelines. When enabled and the panel is closed, activating it MUST open the first timeline of the selected element's animation config. When the panel is open, activating it MUST close the panel.
+The timeline view toggle MUST resolve the selected element's stable identity into its document or component authoring scope. It is disabled when no owned sequence, including its reachable child clips, contains a property track whose `PropertyTarget` resolves to that element. When enabled and the panel is closed, activating it MUST open by stable owner/sequence address the first such sequence in canonical owner order. When the panel is open, activating it MUST close the panel. Sequence display names remain presentation labels and MUST NOT be used as identity fallbacks.
 
 #### Scenario: Animation toolbar controls
 
@@ -379,7 +379,7 @@ The timeline view toggle MUST be disabled when no selected element has any timel
 
 #### Scenario: Timeline toggle enabled state
 
-- GIVEN a selected element has at least one timeline
+- GIVEN a selected element is targeted by at least one canonical sequence track
 - WHEN the bottom toolbar renders
 - THEN the timeline toggle is enabled; activating it opens the first timeline
 
@@ -392,7 +392,8 @@ The timeline view toggle MUST be disabled when no selected element has any timel
 #### Acceptance Criteria
 
 - [ ] Given the demo shell loads, a floating Animation toolbar renders near the bottom-center with Play/Pause, Reset, and a timeline toggle
-- [ ] Given no selected element with timelines, the timeline toggle is disabled
+- [ ] Given no canonical sequence track targets the selected element, the timeline toggle is disabled
+- [ ] Given multiple targeting sequences, activating the toggle opens the first sequence in canonical owner order by stable owner/sequence address
 - [ ] Given a timeline is open, pressing Play calls the timeline playback handler (not document playback)
 - [ ] Given a timeline is open, pressing Reset stops the timeline and resets its playhead to 0
 - [ ] Given no timeline is open, pressing Play toggles document-level animation preview

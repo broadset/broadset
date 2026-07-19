@@ -24,13 +24,3 @@ export function decodeDataUri(uri: string): { readonly mime: string; readonly by
 
   return { mime, bytes: new TextEncoder().encode(decodeURIComponent(data)) };
 }
-
-export function bytesToDataUri(bytes: Uint8Array, mime: string): string {
-  let binary = '';
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return `data:${mime};base64,${btoa(binary)}`;
-}

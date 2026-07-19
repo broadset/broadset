@@ -2,21 +2,21 @@
 
 ## Purpose
 
-Defines JSON document export, OGraf broadcast package generation, video export, QR code SVG fragment generation, filename sanitization, and cross-format conformance/stress testing.
+Defines canonical project JSON export, OGraf broadcast package generation, video export, QR-code SVG output, filename sanitization, and cross-format conformance/stress testing.
 
 ---
 
 ## Requirements
 
-### Requirement: JSON Document Export
+### Requirement: Canonical Project JSON Export
 
-The system MUST export a valid JSON representation of a `BroadsetProject` preserving schema, animation config, multi-document structure, and all supported element types. Round-trips (export→parse→validate) MUST preserve data without loss for any valid project, including empty documents and large documents.
+The system MUST export strict `BroadsetProjectV1` JSON with exact v1 identity and preserve resources, documents, template groups, interop, extensions, pages, components, sequences, lifecycle, state machines, bindings, and every closed element variant. Raw canonical JSON uses `.broadset.json`; `.bsp` remains the package format. Export→parse→validate MUST preserve semantic data without loss for any valid project, including documents with no elements and large projects.
 
-#### Scenario: Schema and animation preserved
+#### Scenario: Schema and sequences preserved
 
-- GIVEN a document with animations
+- GIVEN a canonical project with document/component sequences, lifecycle, and state machines
 - WHEN exported and re-parsed
-- THEN the JSON is valid and animation config is intact
+- THEN exact identity validates and all stable animation identities/references are intact
 
 #### Scenario: Multi-page export
 
@@ -24,15 +24,21 @@ The system MUST export a valid JSON representation of a `BroadsetProject` preser
 - WHEN exported
 - THEN all pages are present in the JSON
 
-#### Scenario: All element types round-trip
+#### Scenario: Closed element union round-trips
 
-- GIVEN a document with text, image, rectangle, path, ellipse, svg, qrcode, group, video, clock, and ticker elements
+- GIVEN a document containing text, image, vector rectangle/ellipse/structured-path/boolean, group, component-instance, video, audio, clock, ticker, qrcode, foreign, and plugin elements
 - WHEN round-tripped through JSON
-- THEN all types are preserved
+- THEN every kind/subtype and typed payload is preserved
 
-#### Scenario: Empty document round-trip
+#### Scenario: Imported SVG mappings round-trip
 
-- GIVEN an empty document
+- GIVEN an SVG import that mapped recognized shapes to vector subtypes and unsupported source to sanitized-vector/preview-only foreign elements plus interop records
+- WHEN the resulting canonical project is exported and re-parsed
+- THEN native mappings, inert blob/preview references, diagnostics, and interop source identity are preserved without a core `svg` kind
+
+#### Scenario: Element-empty document round-trip
+
+- GIVEN a valid document with at least one page and no elements
 - WHEN round-tripped
 - THEN structure is preserved
 
@@ -46,34 +52,35 @@ The system MUST export a valid JSON representation of a `BroadsetProject` preser
 
 - GIVEN a project
 - WHEN exported via download utility
-- THEN the payload is valid BroadsetProject JSON
+- THEN the payload is valid `BroadsetProjectV1` JSON
 
 #### Acceptance Criteria
 
-- [ ] Given a document with animations, the JSON is valid and animation config is intact
+- [ ] Given canonical sequences/lifecycle/state machines, exact identities and references survive round-trip
 - [ ] Given a multi-page document, all pages are present in the JSON
-- [ ] Given a document with text, image, rectangle, path, ellipse, svg, qrcode, group, video, clock, and ticker elements, all types are preserved
-- [ ] Given an empty document, structure is preserved
+- [ ] Given every closed kind and vector subtype, typed payloads survive round-trip
+- [ ] Given recognized/unsupported SVG import results, native vector, foreign fallback, and interop data survive without a core `svg` kind
+- [ ] Given a valid element-empty document, structure is preserved
 - [ ] Given a document with 100 elements, no data loss occurs
-- [ ] Given a document, the payload is valid BroadsetDocument JSON
+- [ ] Given canonical export, the payload is strict `BroadsetProjectV1` with exact v1 identity; raw canonical JSON uses `.broadset.json`, not `.bsp`
 
 ---
 
 ### Requirement: OGraf Package Generation
 
-The system MUST create one OGraf broadcast package per top-level element. Each package MUST include a non-real-time capable manifest with runtime methods. Text element content MUST be exposed as default values in the schema. Image elements MUST NOT be exposed as text data inputs. QR elements MUST be pre-rendered to inline SVG. Inline SVG payload fragments MUST be preserved.
+The system MUST create one OGraf broadcast package per resolved top-level page-root instance. Each package MUST include a non-real-time capable manifest with runtime methods. Structured text run values selected by typed bindings MAY become schema defaults. Images MUST NOT become text inputs. QR-code values render to safe inline SVG output. Sanitized-vector foreign source remains inert and may be emitted only through the authorized sanitizer; preview-only foreign content uses its preview or a diagnostic.
 
-#### Scenario: One package per element
+#### Scenario: One package per resolved root instance
 
-- GIVEN a document with 3 top-level elements
+- GIVEN a page with 3 resolved top-level root instances
 - WHEN OGraf packages are generated
 - THEN 3 packages are produced
 
 #### Scenario: Text content as schema defaults
 
-- GIVEN text elements with content
+- GIVEN structured text elements with selected run text targets
 - WHEN exported
-- THEN schema default values contain the text content
+- THEN schema defaults contain the inert Unicode run values
 
 #### Scenario: Image excluded from text inputs
 
@@ -89,8 +96,8 @@ The system MUST create one OGraf broadcast package per top-level element. Each p
 
 #### Acceptance Criteria
 
-- [ ] Given a document with 3 top-level elements, 3 packages are produced
-- [ ] Given text elements with content, schema default values contain the text content
+- [ ] Given 3 resolved top-level root instances, 3 packages are produced
+- [ ] Given selected structured-text run targets, schema defaults contain inert Unicode values
 - [ ] Given an image element, it is not exposed as a text data input
 - [ ] Given a QR code element, the runtime contains pre-rendered inline SVG
 
@@ -128,11 +135,11 @@ The system MUST report video export as unsupported when `VideoEncoder` is not av
 
 ### Requirement: QR SVG Fragment Generation
 
-The system MUST generate SVG fragments with a white background rectangle and dark QR modules. Empty content MUST return null.
+The system MUST generate SVG fragments with a white background rectangle and dark QR modules from the typed QR-code value. An empty typed value returns null.
 
-#### Scenario: Empty content returns null
+#### Scenario: Empty QR value returns null
 
-- GIVEN empty content
+- GIVEN an empty typed QR-code value
 - WHEN QR SVG fragment is generated
 - THEN the result is null
 
@@ -144,7 +151,7 @@ The system MUST generate SVG fragments with a white background rectangle and dar
 
 #### Acceptance Criteria
 
-- [ ] Given empty content, the result is null
+- [ ] Given an empty typed QR-code value, the result is null
 - [ ] Given `https://example.com`, the result contains `<g fill="#000000">` and a white background rect
 
 ---
@@ -197,7 +204,7 @@ Canonical fixture documents MUST be renderable across SVG, HTML, and OGraf expor
 
 ### Requirement: Import/Export Stress Resilience
 
-The system MUST keep SVG export→import valid for seeded random documents. PPTX export→import MUST produce non-empty results for random documents. Mixed unsupported SVG payloads MUST NOT throw or drop all content.
+The system MUST keep SVG export→import valid for seeded random canonical projects. PPTX export→import MUST produce valid non-empty mapped results for compatible random projects. Mixed unsupported external SVG constructs MUST map to canonical foreign/interop preservation with diagnostics and MUST NOT throw or silently drop all content.
 
 #### Scenario: SVG stress round-trip
 
@@ -205,16 +212,16 @@ The system MUST keep SVG export→import valid for seeded random documents. PPTX
 - WHEN SVG export→import is performed
 - THEN the result is valid
 
-#### Scenario: Unsupported SVG fragments handled gracefully
+#### Scenario: Unsupported external SVG constructs handled gracefully
 
-- GIVEN mixed unsupported SVG payloads
+- GIVEN mixed unsupported constructs in an external SVG source
 - WHEN parsed
-- THEN no errors are thrown and content is preserved
+- THEN no errors are thrown and source is preserved through safe foreign fallback or interop records with diagnostics
 
 #### Acceptance Criteria
 
 - [ ] Given seeded random documents, the result is valid
-- [ ] Given mixed unsupported SVG payloads, no errors are thrown and content is preserved
+- [ ] Given mixed unsupported external SVG constructs, safe foreign/interop preservation prevents silent loss
 
 ---
 

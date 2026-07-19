@@ -1,0 +1,25 @@
+# Enforce LF line endings for all text files across platforms.
+# Prettier is configured with endOfLine: lf; without this, files committed from
+# Windows checkouts carry CRLF and fail prettier:check on CI.
+* text=auto eol=lf
+
+# Explicit binary types (never normalize or diff as text).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.psd binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.mp4 binary
+*.webm binary
+*.wasm binary

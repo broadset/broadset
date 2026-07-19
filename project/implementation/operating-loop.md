@@ -115,7 +115,7 @@ W4 local operate work may overlap W5 service implementation after W3. W6 quality
 | `renderer/**` DOM contract                                     | resolved scene, accessibility, effects, player          | resolved scene contract; parity fixtures; renderer/player adapters                  |
 | `formats/svg/export.ts`                                        | sanitizer, structural reuse, animation                  | security policy first; structural fidelity; animated export                         |
 | `formats/pptx/export/shape-tree.ts`                            | F-01/F-04, component/group semantics                    | W0 group fix under current contract; component exports after RFC-07                 |
-| `demo/src/formatBridge.ts`                                     | chunks, worker RPC, reconciliation                      | worker RPC first; per-format adapters; UI report                                    |
+| `demo/src/formats-loader.ts`                                   | chunks, worker RPC, reconciliation                      | worker RPC first; per-format adapters; UI report                                    |
 
 ### Change sizing
 

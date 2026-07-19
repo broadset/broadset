@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -9,28 +9,24 @@ import { describe, expect, it } from 'vitest';
  * boundary.
  *
  * The demo's main bundle MUST stay free of runtime-loaded
- * `@broadset/formats` references — every importer / exporter (PPTX,
- * PSD, SVG, video encoder) sits behind a dynamic `await import()` in
- * `formatBridge.ts` so users who never touch import / export don't
- * pay the multi-MB hit. Without this guard a single accidental
- * `import { exportPptxBytes } from '@broadset/formats'` anywhere in
- * the demo source statically pulls fontkit, fast-xml-parser,
- * svgpath, ag-psd, and the rest into the entry chunk.
+ * `@broadset/formats` references. Native BSP package loading remains
+ * behind a dynamic `await import()` so startup does not pay for the
+ * formats package. Without this guard, one accidental value import
+ * anywhere in demo source pulls the complete formats graph into the
+ * entry chunk.
  *
  * Allowed:
  *   - `import type ... from '@broadset/formats'` (type-only, erased)
- *   - `await import('@broadset/formats')` inside formatBridge.ts
- *   - `await import('../formatBridge')` from any consumer that needs
- *     to dispatch import / export at runtime
+ *   - `await import('@broadset/formats')` inside an approved lazy loader
  *
  * Anything else — bare static `import { X } from '@broadset/formats'`,
  * `require('@broadset/formats')`, or `import('@broadset/formats')`
- * outside formatBridge.ts — is a regression.
+ * outside an approved loader — is a regression.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FORMATS_MODULE = '@broadset/formats';
-const ALLOWED_DYNAMIC_IMPORTERS: ReadonlySet<string> = new Set(['formatBridge.ts']);
+const ALLOWED_DYNAMIC_IMPORTERS: ReadonlySet<string> = new Set(['formats-loader.ts']);
 
 interface Offender {
   readonly file: string;
@@ -92,13 +88,13 @@ describe('demo lazy-formats bundle boundary', () => {
     ).toHaveLength(0);
   });
 
-  it('only formatBridge.ts uses dynamic import("@broadset/formats")', async () => {
+  it('only approved lazy loaders use dynamic import("@broadset/formats")', async () => {
     const files = await collectSourceFiles(HERE);
     const offenders: Offender[] = [];
 
     for (const file of files) {
       const source = await readFile(file, 'utf8');
-      const fileName = file.split('/').pop() ?? '';
+      const fileName = basename(file);
       const dynamicMatches = source.match(DYNAMIC_IMPORT) ?? [];
 
       if (dynamicMatches.length === 0) continue;
@@ -111,7 +107,7 @@ describe('demo lazy-formats bundle boundary', () => {
 
     expect(
       offenders,
-      `Dynamic import("@broadset/formats") outside formatBridge.ts:\n${JSON.stringify(offenders, null, 2)}`,
+      `Dynamic import("@broadset/formats") outside approved lazy loaders:\n${JSON.stringify(offenders, null, 2)}`,
     ).toHaveLength(0);
   });
 });

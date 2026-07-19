@@ -106,21 +106,21 @@ Only exporters that have their feature flag enabled MUST appear.
 
 When an exporter is selected, the options panel MUST display controls specific to that format:
 
-| Format   | Options                                                                                                                                                                           |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PDF      | Base64-embed assets toggle (HeroUI `Switch`)                                                                                                                                      |
-| PSD      | (no extra options)                                                                                                                                                                |
-| PPTX     | (no extra options)                                                                                                                                                                |
-| PNG      | Pixel ratio (NumField, 1–4), Background color (ColorInput)                                                                                                                        |
-| JPEG     | Pixel ratio (NumField, 1–4), Quality (HeroUI `Slider`, 0–1), Background color (ColorInput)                                                                                        |
-| MP4/WebM | FPS (HeroUI `Select`: 24/25/30/50/60 or custom NumField), Resolution W×H (NumField pair), Bitrate (NumField, kbps), Timeline selector (HeroUI `Select` listing element timelines) |
-| OGraf    | ID prefix (HeroUI `Input`)                                                                                                                                                        |
-| HTML     | (no extra options)                                                                                                                                                                |
-| SVG      | (no extra options)                                                                                                                                                                |
+| Format   | Options                                                                                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PDF      | Base64-embed assets toggle (HeroUI `Switch`)                                                                                                                                                                                                                                         |
+| PSD      | (no extra options)                                                                                                                                                                                                                                                                   |
+| PPTX     | (no extra options)                                                                                                                                                                                                                                                                   |
+| PNG      | Pixel ratio (NumField, 1–4), Background color (ColorInput)                                                                                                                                                                                                                           |
+| JPEG     | Pixel ratio (NumField, 1–4), Quality (HeroUI `Slider`, 0–1), Background color (ColorInput)                                                                                                                                                                                           |
+| MP4/WebM | FPS (HeroUI `Select`: 24/25/30/50/60 or custom NumField), Resolution W×H (NumField pair), Bitrate (NumField, kbps), Sequence selector (HeroUI `Select` listing document sequences and resolved component-instance sequences by name, with stable owner/sequence addresses as values) |
+| OGraf    | ID prefix (HeroUI `Input`)                                                                                                                                                                                                                                                           |
+| HTML     | (no extra options)                                                                                                                                                                                                                                                                   |
+| SVG      | (no extra options)                                                                                                                                                                                                                                                                   |
 
 **Renderer Preview:**
 
-The export modal MUST include an embedded renderer preview showing the current document. For animated formats (MP4, WebM, OGraf), the preview MUST play the selected timeline animation. The preview MUST update when dynamic data fields change.
+The export modal MUST include an embedded renderer preview showing the current document. For animated formats (MP4, WebM, OGraf), the preview MUST play the selected canonical sequence by stable owner/sequence address. The preview MUST update when dynamic data fields change.
 
 **Export Progress:**
 
@@ -193,26 +193,26 @@ Each asset MUST render as a clickable thumbnail button showing the image preview
 
 ### Requirement: New Document Modal
 
-The system MUST support category tabs for switching preset groups. Selecting a preset and clicking Create MUST create a document with the correct mode. Without a selection, Create MUST NOT fire. Custom presets MUST override built-in ones. Empty custom presets MUST fall back to built-in presets.
+The system MUST support category tabs for switching preset groups. Selecting a preset and clicking Create MUST instantiate a canonical document with the preset's `kind`, surface, color configuration, and required project resources. Without a selection, Create MUST NOT fire. Custom presets MUST override built-in ones. Empty custom presets MUST fall back to built-in presets.
 
 **Layout Structure:**
 
 | Zone            | Content                                                                                                |
 | --------------- | ------------------------------------------------------------------------------------------------------ |
 | Category tabs   | HeroUI `Tabs` — one tab per preset category (Broadcast, Print, Social Media, Commercial, Large Format) |
-| Preset table    | HeroUI `Table` with columns: Name, Dimensions (formatted as `W × H unit`), Mode                        |
+| Preset table    | HeroUI `Table` with columns: Name, Dimensions (formatted as `W × H unit`), Kind                        |
 | Selected preset | Highlighted table row for the selected preset                                                          |
 | Footer buttons  | Cancel (ghost) and Create Document (primary) — Create disabled until a preset is selected              |
 
 **Preset Table:**
 
-Presets MUST be displayed in a HeroUI `Table` (not a card grid) for scannable comparison. Each row MUST show the preset name, formatted dimensions (e.g. `1920 × 1080 px`, `210 × 297 mm`), and document mode. Clicking a row MUST select that preset. The selected row MUST be visually highlighted.
+Presets MUST be displayed in a HeroUI `Table` (not a card grid) for scannable comparison. Each row MUST show the preset name, formatted dimensions (e.g. `1920 × 1080 px`, `210 × 297 mm`), and friendly label for canonical document `kind`. Clicking a row MUST select that preset. The selected row MUST be visually highlighted.
 
 #### Scenario: Create from preset
 
-- GIVEN a selected screen preset
+- GIVEN a selected motion preset
 - WHEN Create is clicked
-- THEN onCreateDocument fires with correct document mode
+- THEN onCreateDocument fires with canonical `kind: 'motion'` and its required project resources
 
 #### Scenario: Custom presets
 
@@ -228,7 +228,7 @@ Presets MUST be displayed in a HeroUI `Table` (not a card grid) for scannable co
 
 #### Acceptance Criteria
 
-- [ ] Given a selected screen preset, onCreateDocument fires with correct document mode
+- [ ] Given a selected preset, onCreateDocument fires with the correct canonical document kind and resources
 - [ ] Given custom presets configured, custom categories and presets are shown
 - [ ] Given no preset selected, onCreateDocument is NOT called
 
@@ -328,7 +328,7 @@ All modals MUST conform to WCAG 2.1 AA standards. Modal containers MUST use `rol
 
 ### Requirement: Template Browser Modal
 
-When content templates are configured (via `EditorConfig.templates`), the New Document flow MUST include a template browser section. The template browser MUST display templates grouped by `category` with alphabetically sorted category headers. Each template MUST show a `thumbnail` image and `name` label. Selecting a template MUST highlight it with a visible selection ring. Confirming the selection (double-click or "Create" button) MUST load the template's stored `BroadsetDocument` as a new document, replacing the current document (with confirmation if the current document has unsaved changes). The browser MUST include a search input that filters templates by name (case-insensitive substring match). When no templates match the search, a "No templates found" message MUST appear. When `EditorConfig.templates` is empty or absent, the template browser section MUST NOT appear in the New Document modal — only blank document size presets are shown. The template browser MUST use a responsive grid layout (minimum 3 columns, maximum 5) with thumbnail cards.
+When canonical v1 templates are configured through `EditorConfig.templates`, the New Document flow MUST include a template browser grouped by category with alphabetically sorted headers. Each template shows thumbnail and name; selection has a visible ring. Confirming instantiates the template's `BroadsetDocumentV1` plus all required project resources with fresh IDs as needed, validates the whole resulting project, and replaces project state after unsaved-change confirmation. Search filters names case-insensitively. Empty results show “No templates found”; absent templates hide the section. The browser uses a responsive three-to-five-column grid.
 
 #### Scenario: Browse templates by category
 

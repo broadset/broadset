@@ -19,6 +19,10 @@ async function selectUnlockedRectangle(page: Page): Promise<void> {
     force: true,
     position: { x: box.width * 0.4, y: box.height * 0.4 },
   });
+  await preview.click({
+    force: true,
+    position: { x: box.width * 0.6, y: box.height * 0.6 },
+  });
 }
 
 async function openElementContextMenuViaRightClick(page: Page): Promise<void> {

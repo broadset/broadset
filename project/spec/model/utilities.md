@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines model utility behavior for document cloning, built-in element capability profiles, and clip-path path-string normalization. This domain provides contract-level helpers for safe document duplication and consistent capability/clip-path interpretation. It does NOT define document schema invariants or animation playback behavior. See [conventions](../../README.md).
+Defines model utility behavior for canonical document cloning, derived capability profiles, boundary length parsing, surface-unit conversion, typed clip conversion, and runtime anchor inference.
 
 ---
 
@@ -33,17 +33,17 @@ The system MUST return a deep-equal document clone that is structurally independ
 
 ### Requirement: Built-In Capability Profiles
 
-The system MUST expose deterministic capability profiles for built-in element kinds, and unknown kinds MUST resolve to a fully disabled capability profile.
+The system MUST expose deterministic capability profiles for every canonical core element kind and vector payload subtype. Unregistered plugin elements resolve to fully disabled defaults; unknown core discriminants fail structural validation.
 
 #### Scenario: Built-in kinds have defined capability profiles
 
-- GIVEN the built-in element kinds
+- GIVEN the built-in element kinds and vector geometry subtypes
 - WHEN their capability profiles are requested
 - THEN each built-in kind has a defined profile
 
 #### Scenario: Unknown kind uses disabled defaults
 
-- GIVEN an unknown or empty element kind
+- GIVEN an unregistered plugin element
 - WHEN its capability profile is requested
 - THEN all capability flags are disabled
 
@@ -55,21 +55,22 @@ The system MUST expose deterministic capability profiles for built-in element ki
 
 #### Acceptance Criteria
 
-- [ ] Given the built-in element kinds, each built-in kind has a defined profile
-- [ ] Given an unknown or empty element kind, all capability flags are disabled
+- [ ] Given the built-in element kinds and vector subtypes, each has a defined profile
+- [ ] Given an unregistered plugin element, all capability flags are disabled
+- [ ] Given an unknown core discriminant, structural validation fails
 - [ ] Given a capability profile for a built-in kind, every expected capability key is present and boolean-valued
 
 ---
 
-### Requirement: Clip-Path Path Value Normalization
+### Requirement: Boundary CSS Clip Conversion
 
-The system MUST parse and serialize CSS `path(...)` clip values consistently, and MUST preserve non-path clip values when path-scaling is requested.
+Import/UI boundary utilities MAY parse CSS `path(...)` values consistently, but MUST convert accepted geometry into a typed vector clip source with stable point/segment IDs before project mutation. Serialization back to CSS is an output-boundary operation derived from typed geometry. Non-path CSS values remain unparsed and may be preserved through interop; no CSS clip string enters canonical appearance.
 
 #### Scenario: Path clip values parse from quoted and unquoted forms
 
 - GIVEN `path("...")`, `path('...')`, and `path(...)` inputs
 - WHEN parsed
-- THEN raw path data is returned
+- THEN raw transport path data is returned to the boundary converter and converted to structured geometry before commit
 
 #### Scenario: Non-path clip values are not parsed as path data
 
@@ -80,43 +81,44 @@ The system MUST parse and serialize CSS `path(...)` clip values consistently, an
 #### Scenario: Path serialization and zoom scaling are deterministic
 
 - GIVEN raw path data and a zoom factor
-- WHEN serialized and scaled
-- THEN escaped serialization is valid and scaled coordinates are rounded consistently
+- WHEN converted to structured geometry, scaled, and serialized for output
+- THEN typed coordinates scale deterministically and output escaping is valid
 
 #### Scenario: Default clip path has non-zero dimensions
 
 - GIVEN zero or positive width/height values
-- WHEN a default clip path is generated
-- THEN the generated path uses rectangle geometry with minimum non-zero dimensions
+- WHEN a default typed clip source is generated
+- THEN it uses vector rectangle geometry with minimum non-zero bounds and a fresh stable ID
 
 #### Acceptance Criteria
 
-- [ ] Given `path("...")`, `path('...')`, and `path(...)` inputs, raw path data is returned
+- [ ] Given `path("...")`, `path('...')`, and `path(...)` inputs, boundary parsing succeeds and canonical commit uses structured vector geometry
 - [ ] Given a non-path clip value, the result is null
-- [ ] Given raw path data and a zoom factor, escaped serialization is valid and scaled coordinates are rounded consistently
-- [ ] Given zero or positive width/height values, the generated path uses rectangle geometry with minimum non-zero dimensions
+- [ ] Given raw path data and a zoom factor, typed scaling is deterministic and output serialization is valid
+- [ ] Given zero or positive requested width/height values, the generated vector clip source uses minimum non-zero bounds
+- [ ] Given any accepted CSS clip input, no CSS string is persisted in canonical project data
 
 ---
 
 ### Requirement: Pixel–Millimetre Unit Conversion
 
-The system MUST convert between pixels and millimetres using the document's `canvas.dpi` value (default 96 for screen, 300 for print). Pixel-to-millimetre conversion MUST use the formula `px × (25.4 / dpi)`. Millimetre-to-pixel conversion MUST use the formula `mm × (dpi / 25.4)`. See [format-reference.md](format-reference.md) §16 for the full conversion table.
+The system MUST convert between pixels and millimetres using the active document's positive `surface.dpi`. Pixel-to-millimetre conversion MUST use `px × (25.4 / dpi)` and millimetre-to-pixel conversion MUST use `mm × (dpi / 25.4)`.
 
 #### Scenario: px to mm at 96 DPI
 
-- GIVEN a pixel value of 96 and `canvas.dpi: 96`
+- GIVEN a pixel value of 96 and `surface.dpi: 96`
 - WHEN converted to millimetres
 - THEN the result is 25.4
 
 #### Scenario: mm to px at 96 DPI
 
-- GIVEN a millimetre value of 25.4 and `canvas.dpi: 96`
+- GIVEN a millimetre value of 25.4 and `surface.dpi: 96`
 - WHEN converted to pixels
 - THEN the result is 96
 
 #### Scenario: px to mm at 300 DPI
 
-- GIVEN a pixel value of 300 and `canvas.dpi: 300`
+- GIVEN a pixel value of 300 and `surface.dpi: 300`
 - WHEN converted to millimetres
 - THEN the result is 25.4
 
@@ -131,17 +133,17 @@ The system MUST convert between pixels and millimetres using the document's `can
 
 ### Requirement: Cross-Unit Length Conversion
 
-The system MUST convert between pixels and PostScript points using the document's `canvas.dpi` value via the formulas `px × (72 / dpi)` and `pt × (dpi / 72)`. The system MUST convert between inches and millimetres using the canonical constant `1 in = 25.4 mm`, with no DPI involvement. The system MUST convert `em` values to pixels against a caller-supplied base font size in pixels via `em × fontSizePx`. Each helper MUST preserve the sign of its input and return `0` for a `0` input without DPI coupling.
+The system MUST convert between pixels and PostScript points using `surface.dpi` via `px × (72 / dpi)` and `pt × (dpi / 72)`. Inches and millimetres use `1 in = 25.4 mm` without DPI. `em` values convert against a caller-supplied base font size through `em × fontSizePx`. Each helper preserves sign and returns 0 for zero input.
 
 #### Scenario: px to pt at 96 DPI
 
-- GIVEN a pixel value of 96 and `canvas.dpi: 96`
+- GIVEN a pixel value of 96 and `surface.dpi: 96`
 - WHEN converted to points
 - THEN the result is 72
 
 #### Scenario: pt to px at 300 DPI
 
-- GIVEN a point value of 72 and `canvas.dpi: 300`
+- GIVEN a point value of 72 and `surface.dpi: 300`
 - WHEN converted to pixels
 - THEN the result is 300
 

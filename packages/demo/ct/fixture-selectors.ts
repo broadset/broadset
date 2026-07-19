@@ -1,5 +1,6 @@
 export const FIXTURE_IDS = {
   background: 'el-top-gradient',
+  initialSelection: 'el-sb-home-score',
   title: 'el-scorebug',
   teamHome: 'el-sb-home-abbr',
   teamAway: 'el-sb-away-abbr',

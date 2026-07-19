@@ -9,7 +9,6 @@
  * - properties-sidebar.tsx — PropertiesSidebar orchestrator
  * - layers-sidebar.tsx — LayersSidebar
  * - animation-sidebar.tsx — AnimationSidebar
- * - template-group-panel.tsx — TemplateGroupPanel
  */
 
 export type { AnimationSidebarProps } from './animation-sidebar';
@@ -72,5 +71,3 @@ export {
   TypographyPanel,
   VideoPanel,
 } from './property-panels';
-export type { TemplateGroupPanelProps } from './template-group-panel';
-export { TemplateGroupPanel } from './template-group-panel';

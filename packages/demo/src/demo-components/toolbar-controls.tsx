@@ -1,4 +1,5 @@
-import { Button, Dropdown, Tooltip } from '@heroui/react';
+import { Button, type ButtonRootProps, Dropdown, Tooltip } from '@heroui/react';
+import { useRef } from 'react';
 
 export function ToolbarMenu({
   label,
@@ -37,15 +38,41 @@ export function IconToolButton({
   onPress,
   testId,
   tooltipPlacement = 'bottom',
+  activateOnPressStart = false,
 }: {
   readonly label: string;
   readonly children: React.ReactNode;
+  readonly activateOnPressStart?: boolean | undefined;
   readonly isActive?: boolean | undefined;
   readonly isDisabled?: boolean | undefined;
   readonly onPress: () => void;
   readonly testId?: string | undefined;
   readonly tooltipPlacement?: 'bottom' | 'left' | 'right' | 'top' | undefined;
 }): React.JSX.Element {
+  const hasStartedPressRef = useRef(false);
+  const handlePressStart = (): void => {
+    hasStartedPressRef.current = true;
+    onPress();
+  };
+  const handlePress = (): void => {
+    if (hasStartedPressRef.current) {
+      hasStartedPressRef.current = false;
+
+      return;
+    }
+
+    onPress();
+  };
+  const handlePressEnd = (): void => {
+    queueMicrotask(() => {
+      hasStartedPressRef.current = false;
+    });
+  };
+  const pressProps: Pick<ButtonRootProps, 'onPress' | 'onPressEnd' | 'onPressStart'> =
+    activateOnPressStart ?
+      { onPress: handlePress, onPressEnd: handlePressEnd, onPressStart: handlePressStart }
+    : { onPress };
+
   return (
     <Tooltip delay={0}>
       <Button
@@ -55,7 +82,7 @@ export function IconToolButton({
         isIconOnly
         size="sm"
         variant={isActive ? 'primary' : 'ghost'}
-        onPress={onPress}
+        {...pressProps}
       >
         {children}
       </Button>

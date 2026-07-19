@@ -30,8 +30,8 @@ The visual layer alone is a valid, fully-editable SVG 2 document. Illustrator an
 
 A `broadset:` XML namespace — using the shared URI `https://broadset.io/ns/xmp/1.0/` per IO-D-08 (the same URI used by the PSD `XMPMetadata` packet, the PDF `Metadata` dict, and the PPTX `docProps/custom.xml`; see [spec.md](spec.md) §Broadset XMP Packet) — is declared on the root `<svg>` and carried in a document-level `<metadata>` block using RDF/XML (the W3C-recommended encoding, used by Inkscape for its `<cc:Work>` metadata). The `<metadata>` block carries:
 
-- Project settings, canvas unit/dpi declaration, asset registry (with base64 payloads or external refs per asset), data schema, page definitions and their override maps, element ordering, Dublin Core metadata from `document.metadata`.
-- A `broadset:elements` sequence keyed by element id, each carrying the element's fingerprint (for tag-stripping fallback) and the original-source preservation blob for any SVG construct the importer recognised but cannot represent natively (sanitised `outerHTML` for opaque `svg`-type payloads, metadata-only fields like `dataField` / `visibleWhen` / `repeater`).
+- A defined canonical v1 semantic projection: project identity, surface unit/dpi, resource references, pages/instances, element ordering, structured bindings, and document metadata. Large asset or preservation bytes remain content-addressed rather than base64 metadata.
+- A `broadset:entities` sequence keyed by stable source identity with entity address and baseline semantic hash. Original SVG fragments remain content-addressed blobs referenced by project interop records or safe foreign elements.
 - **No animation data** per IO-D-16 — SVG is a static carrier from Broadset's perspective; animated elements export at their fully-entered "IN" state.
 
 This is the SVG analogue of PDF's XMP and PSD's `BsPs` `additionalInfo` — standards-blessed, preserved by Illustrator and Inkscape across save.
@@ -41,8 +41,8 @@ This is the SVG analogue of PDF's XMP and PSD's `BsPs` `additionalInfo` — stan
 Each rendered element carries:
 
 - `data-bs-id` — stable Broadset element id.
-- `data-bs-kind` — Broadset element type (`text`, `rectangle`, `ellipse`, `path`, `image`, `svg`, `qrcode`, `group`, `video`, `clock`, `ticker`).
-- `data-bs-data-field`, `data-bs-visible-when`, `data-bs-repeater` — optional data-binding markers.
+- `data-bs-kind` — canonical element kind; vector entries additionally carry `data-bs-vector-kind` for rectangle, ellipse, path, or boolean payload.
+- `data-bs-binding-ids` — optional stable binding IDs relevant to the entity.
 - `broadset:content-hash` — namespaced attribute carrying the content-hash fingerprint for identity recovery when `data-bs-*` is stripped.
 
 `data-*` attributes are part of SVG 2 / HTML5 globally and survive Illustrator, Inkscape, Figma import/export, and browser copy-paste unless the user aggressively flattens or restructures. Namespaced `broadset:` attributes are preserved by Illustrator (which uses its own `ai:` namespace) and Inkscape (which uses `sodipodi:` / `inkscape:`).
@@ -61,65 +61,65 @@ Scoring legend for each of the three columns (Export, Import, Round-trip):
 - **metadata-preserved** — round-tripped via the `<metadata>` packet or `data-bs-*` tag; not visible in the visual layer but the user sees it in Broadset after re-import.
 - **dropped** — the feature is not representable; deliberately omitted on export, flagged on import.
 
-| Domain       | Feature                                                                                               | Export                                                                                                                              | Import                                           | Round-trip                                                          |
-| ------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
-| Vectors      | Rectangle / ellipse / path                                                                            | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Circle (`cx` / `cy` / `r`)                                                                            | native (as `ellipse`)                                                                                                               | native                                           | native                                                              |
-| Vectors      | Polygon / polyline (`points="..."`)                                                                   | native (as `path` with `M`/`L`/`Z` commands)                                                                                        | native                                           | native                                                              |
-| Vectors      | Element-level positional attributes (`<rect x y>`, `<circle cx cy>`, `<ellipse cx cy>`)               | n/a (Broadset uses `transform=`)                                                                                                    | native (combined with parent transform)          | n/a                                                                 |
-| Vectors      | Rounded rectangle (`borderRadius`)                                                                    | native (`rx`/`ry`)                                                                                                                  | native                                           | native                                                              |
-| Vectors      | Stroke — width / dasharray / dashoffset                                                               | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Stroke — linecap / linejoin                                                                           | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Stroke — miterlimit                                                                                   | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Stroke — arrow heads (head / tail)                                                                    | native (marker refs)                                                                                                                | native                                           | native                                                              |
-| Vectors      | Fill — solid colour                                                                                   | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Fill — linear gradient                                                                                | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Fill — radial gradient                                                                                | native                                                                                                                              | native                                           | native                                                              |
-| Vectors      | Fill — conic gradient                                                                                 | native (linear fallback) + metadata-preserved                                                                                       | metadata-preserved                               | native (recovered from metadata)                                    |
-| Vectors      | Fill — pattern                                                                                        | native (`<pattern>`)                                                                                                                | native                                           | native                                                              |
-| Vectors      | Fill — picture                                                                                        | native (`<pattern>` with `<image>`)                                                                                                 | native                                           | native                                                              |
-| Text         | Single-run plain text                                                                                 | native (`<text>` + `<tspan>`)                                                                                                       | native                                           | native                                                              |
-| Text         | Multi-run styled text (`TextBody` + `Paragraph` + `Run`)                                              | native (`<tspan>` per run)                                                                                                          | native                                           | native                                                              |
-| Text         | Paragraph style (alignment, leading, tracking, first-line indent)                                     | native                                                                                                                              | native                                           | native                                                              |
-| Text         | Text decoration (underline, strike)                                                                   | native                                                                                                                              | native                                           | native                                                              |
-| Text         | Text-on-path                                                                                          | native (`<textPath>`)                                                                                                               | native                                           | native                                                              |
-| Text         | Font — embedded WOFF2 / TTF / OTF (`embed` option)                                                    | native (`<defs><style>@font-face { src: url(data:font/...;base64,...) }`, subset to used codepoints via `_shared/fonts/subsetFont`) | n/a (consumer reads `@font-face`)                | n/a                                                                 |
-| Text         | Font — external reference (`reference` option)                                                        | native (`@font-face { src: url(<external>) }`)                                                                                      | n/a                                              | n/a                                                                 |
-| Text         | Font — flattened to paths (`flatten` option)                                                          | native (`<g>` of `<path>` glyph outlines via fontkit `font.layout`)                                                                 | n/a (paths re-read as paths, text identity lost) | lossy                                                               |
-| Groups       | `'group'` element ↔ `<g>`                                                                             | native                                                                                                                              | native                                           | native                                                              |
-| Groups       | Nested groups + composed transforms                                                                   | native                                                                                                                              | native                                           | native                                                              |
-| Groups       | Group-level opacity / blend mode / effects                                                            | native                                                                                                                              | native                                           | native                                                              |
-| Transforms   | `translate`                                                                                           | native                                                                                                                              | native                                           | native                                                              |
-| Transforms   | `rotate`                                                                                              | native                                                                                                                              | native                                           | native                                                              |
-| Transforms   | `scale`                                                                                               | n/a (not in Broadset fields per IO-D-02)                                                                                            | native (baked to path)                           | baked                                                               |
-| Transforms   | `skewX` / `skewY`                                                                                     | n/a (not in Broadset fields per IO-D-02)                                                                                            | native (baked to path)                           | baked                                                               |
-| Transforms   | `matrix`                                                                                              | n/a (composed from above)                                                                                                           | native (baked to path when non-decomposable)     | baked                                                               |
-| Masks        | `<clipPath>`                                                                                          | native (`customClipPath` style → `<clipPath>` def)                                                                                  | native                                           | native                                                              |
-| Masks        | `<mask>`                                                                                              | native (`<mask>` def emitted when `style.maskType !== 'none'`, deduplicated by content hash)                                        | n/a                                              | n/a                                                                 |
-| Masks        | `<pattern>` (pattern fill)                                                                            | native (`<pattern>` def with `<image>` body for `fill.kind === 'pattern' \| 'picture'`, deduplicated by content hash)               | n/a                                              | n/a                                                                 |
-| Filters      | `box-shadow` / drop-shadow                                                                            | native (`<filter><feDropShadow>`, deduplicated by content hash)                                                                     | native                                           | native                                                              |
-| Filters      | Blur                                                                                                  | native (`<feGaussianBlur>` via `style.filter` `FilterStack`)                                                                        | n/a                                              | n/a                                                                 |
-| Filters      | Structured `FilterPrimitive[]` (hue-rotate, saturate, grayscale, sepia, invert, brightness, contrast) | native (`<feColorMatrix>` / `<feComponentTransfer>` per primitive, content-hash-deduped)                                            | n/a                                              | n/a                                                                 |
-| Images       | Embedded (data URI)                                                                                   | native                                                                                                                              | native                                           | native                                                              |
-| Images       | External reference (URL)                                                                              | native                                                                                                                              | native                                           | native                                                              |
-| Colour       | sRGB hex / `rgb()` / `rgba()`                                                                         | native                                                                                                                              | native                                           | native                                                              |
-| Colour       | `hsl()`                                                                                               | native                                                                                                                              | native                                           | native                                                              |
-| Colour       | `oklab()` / `oklch()` / `color(display-p3 …)`                                                         | native (visual layer + `BroadsetColor.originalColor` metadata)                                                                      | native                                           | native                                                              |
-| Colour       | Theme-slot references                                                                                 | native (resolved visually + metadata-preserved tag)                                                                                 | native                                           | native                                                              |
-| Metadata     | Document `<metadata>` `broadset:` RDF/XML packet                                                      | native                                                                                                                              | native                                           | native                                                              |
-| Metadata     | Per-element `data-bs-*` tag                                                                           | native                                                                                                                              | native                                           | native                                                              |
-| Metadata     | Per-element `broadset:content-hash` attribute                                                         | native                                                                                                                              | native                                           | native                                                              |
-| Metadata     | Content-hash fallback when tags stripped                                                              | n/a                                                                                                                                 | native                                           | native                                                              |
-| Metadata     | `document.metadata` (Dublin Core)                                                                     | native (XMP in `<metadata>`)                                                                                                        | native                                           | native                                                              |
-| Animation    | Animations (`animations` array, keyframes)                                                            | dropped (exported IN state)                                                                                                         | dropped                                          | dropped — animations are not serialised to `<metadata>` per IO-D-16 |
-| Data binding | `dataField`, `visibleWhen`, `repeater`                                                                | metadata-preserved (`data-bs-*` + `<metadata>`)                                                                                     | metadata-preserved                               | metadata-preserved                                                  |
-| Pages        | Multi-page override maps                                                                              | metadata-preserved (`<metadata>` `broadset:pages`)                                                                                  | metadata-preserved                               | metadata-preserved                                                  |
-| Preservation | Opaque `svg`-type payload                                                                             | native (sanitised `outerHTML`)                                                                                                      | native                                           | native                                                              |
-| Preservation | Unknown elements (`<use>` / `<symbol>` references)                                                    | n/a (dereferenced inline on import)                                                                                                 | native (dereferenced inline group)               | lossy (structural — visually identical)                             |
-| Security     | `<script>`                                                                                            | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                                                 |
-| Security     | `on*=` event handlers                                                                                 | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                                                 |
-| Security     | `javascript:` URLs                                                                                    | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                                                 |
-| Security     | `<foreignObject>` with active content                                                                 | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                                                 |
+| Domain       | Feature                                                                                               | Export                                                                                                                              | Import                                           | Round-trip                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| Vectors      | Rectangle / ellipse / path                                                                            | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Circle (`cx` / `cy` / `r`)                                                                            | native (as vector ellipse)                                                                                                          | native                                           | native                                         |
+| Vectors      | Polygon / polyline (`points="..."`)                                                                   | native (as vector structured path)                                                                                                  | native                                           | native                                         |
+| Vectors      | Element-level positional attributes (`<rect x y>`, `<circle cx cy>`, `<ellipse cx cy>`)               | n/a (Broadset uses `transform=`)                                                                                                    | native (combined with parent transform)          | n/a                                            |
+| Vectors      | Rounded rectangle (`geometryData.cornerRadii`)                                                        | native (`rx`/`ry`)                                                                                                                  | native                                           | native                                         |
+| Vectors      | Stroke — width / dasharray / dashoffset                                                               | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Stroke — linecap / linejoin                                                                           | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Stroke — miterlimit                                                                                   | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Stroke — arrow heads (head / tail)                                                                    | native (marker refs)                                                                                                                | native                                           | native                                         |
+| Vectors      | Fill — solid colour                                                                                   | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Fill — linear gradient                                                                                | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Fill — radial gradient                                                                                | native                                                                                                                              | native                                           | native                                         |
+| Vectors      | Fill — conic gradient                                                                                 | native (linear fallback) + metadata-preserved                                                                                       | metadata-preserved                               | native (recovered from metadata)               |
+| Vectors      | Fill — pattern                                                                                        | native (`<pattern>`)                                                                                                                | native                                           | native                                         |
+| Vectors      | Fill — picture                                                                                        | native (`<pattern>` with `<image>`)                                                                                                 | native                                           | native                                         |
+| Text         | Single-run plain text                                                                                 | native (`<text>` + `<tspan>`)                                                                                                       | native                                           | native                                         |
+| Text         | Multi-run styled text (`TextBody` + `Paragraph` + `Run`)                                              | native (`<tspan>` per run)                                                                                                          | native                                           | native                                         |
+| Text         | Paragraph style (alignment, leading, tracking, first-line indent)                                     | native                                                                                                                              | native                                           | native                                         |
+| Text         | Text decoration (underline, strike)                                                                   | native                                                                                                                              | native                                           | native                                         |
+| Text         | Text-on-path                                                                                          | native (`<textPath>`)                                                                                                               | native                                           | native                                         |
+| Text         | Font — embedded WOFF2 / TTF / OTF (`embed` option)                                                    | native (`<defs><style>@font-face { src: url(data:font/...;base64,...) }`, subset to used codepoints via `_shared/fonts/subsetFont`) | n/a (consumer reads `@font-face`)                | n/a                                            |
+| Text         | Font — external reference (`reference` option)                                                        | native (`@font-face { src: url(<external>) }`)                                                                                      | n/a                                              | n/a                                            |
+| Text         | Font — flattened to paths (`flatten` option)                                                          | native (`<g>` of `<path>` glyph outlines via fontkit `font.layout`)                                                                 | n/a (paths re-read as paths, text identity lost) | lossy                                          |
+| Groups       | `'group'` element ↔ `<g>`                                                                             | native                                                                                                                              | native                                           | native                                         |
+| Groups       | Nested groups + composed transforms                                                                   | native                                                                                                                              | native                                           | native                                         |
+| Groups       | Group-level opacity / blend mode / effects                                                            | native                                                                                                                              | native                                           | native                                         |
+| Transforms   | `translate`                                                                                           | native                                                                                                                              | native                                           | native                                         |
+| Transforms   | `rotate`                                                                                              | native                                                                                                                              | native                                           | native                                         |
+| Transforms   | `scale`                                                                                               | native through exact matrix                                                                                                         | native                                           | native                                         |
+| Transforms   | `skewX` / `skewY`                                                                                     | native through exact matrix                                                                                                         | native                                           | native                                         |
+| Transforms   | `matrix`                                                                                              | native through exact affine/3D matrix                                                                                               | native                                           | native                                         |
+| Masks        | `<clipPath>`                                                                                          | native (typed `appearance.clip` vector reference → `<clipPath>` def)                                                                | native                                           | native                                         |
+| Masks        | `<mask>`                                                                                              | native (typed `appearance.mask` with explicit alpha/luminance mode)                                                                 | n/a                                              | n/a                                            |
+| Masks        | `<pattern>` (pattern fill)                                                                            | native (`<pattern>` def with `<image>` body for `fill.kind === 'pattern' \| 'picture'`, deduplicated by content hash)               | n/a                                              | n/a                                            |
+| Filters      | `box-shadow` / drop-shadow                                                                            | native (`<filter><feDropShadow>`, deduplicated by content hash)                                                                     | native                                           | native                                         |
+| Filters      | Blur                                                                                                  | native (`<feGaussianBlur>` via typed effect stack)                                                                                  | n/a                                              | n/a                                            |
+| Filters      | Structured `FilterPrimitive[]` (hue-rotate, saturate, grayscale, sepia, invert, brightness, contrast) | native (`<feColorMatrix>` / `<feComponentTransfer>` per primitive, content-hash-deduped)                                            | n/a                                              | n/a                                            |
+| Images       | Embedded (data URI)                                                                                   | native                                                                                                                              | native                                           | native                                         |
+| Images       | External reference (URL)                                                                              | native                                                                                                                              | native                                           | native                                         |
+| Colour       | sRGB hex / `rgb()` / `rgba()`                                                                         | native                                                                                                                              | native                                           | native                                         |
+| Colour       | `hsl()`                                                                                               | native                                                                                                                              | native                                           | native                                         |
+| Colour       | `oklab()` / `oklch()` / `color(display-p3 …)`                                                         | native typed authoritative `ColorValue` plus visual fallback                                                                        | native                                           | native                                         |
+| Colour       | Theme-slot references                                                                                 | native (resolved visually + metadata-preserved tag)                                                                                 | native                                           | native                                         |
+| Metadata     | Document `<metadata>` `broadset:` RDF/XML packet                                                      | native                                                                                                                              | native                                           | native                                         |
+| Metadata     | Per-element `data-bs-*` tag                                                                           | native                                                                                                                              | native                                           | native                                         |
+| Metadata     | Per-element `broadset:content-hash` attribute                                                         | native                                                                                                                              | native                                           | native                                         |
+| Metadata     | Content-hash fallback when tags stripped                                                              | n/a                                                                                                                                 | native                                           | native                                         |
+| Metadata     | `document.metadata` (Dublin Core)                                                                     | native (XMP in `<metadata>`)                                                                                                        | native                                           | native                                         |
+| Animation    | Sequences/state resolved at declared export tick                                                      | dropped after resolution                                                                                                            | dropped                                          | static SVG carrier stores no runtime animation |
+| Data binding | Stable binding IDs, field-ID expressions, typed repeaters                                             | interop/metadata-preserved                                                                                                          | interop/metadata-preserved                       | interop/metadata-preserved                     |
+| Pages        | Page instance and override records                                                                    | metadata-preserved (`<metadata>` `broadset:pages`)                                                                                  | metadata-preserved                               | metadata-preserved                             |
+| Preservation | Safe foreign fallback and interop record                                                              | native (inert blob + preview or sanitized-vector mode)                                                                              | native                                           | native                                         |
+| Preservation | Unknown elements (`<use>` / `<symbol>` references)                                                    | n/a (dereferenced inline on import)                                                                                                 | native (dereferenced inline group)               | lossy (structural — visually identical)        |
+| Security     | `<script>`                                                                                            | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                            |
+| Security     | `on*=` event handlers                                                                                 | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                            |
+| Security     | `javascript:` URLs                                                                                    | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                            |
+| Security     | `<foreignObject>` with active content                                                                 | dropped + rejected                                                                                                                  | dropped + warning                                | n/a                                            |
 
 ---
 
@@ -160,14 +160,14 @@ Broadset `'group'` elements MUST export as real `<g>` nodes that recursively ser
 
 #### Scenario: Group with three children
 
-- GIVEN a Broadset document with a `'group'` element containing three children (a rectangle, a text node, and a nested group)
+- GIVEN a canonical document with a group containing a vector rectangle, a text element, and a nested group
 - WHEN exported to SVG
 - THEN the output contains `<g data-bs-id="…" data-bs-kind="group">` with the three child nodes serialised inside, in the same order they appear in the `parentId` tree
 - AND the nested child group itself contains its own children recursively
 
 #### Scenario: Group transform composition
 
-- GIVEN a `'group'` with `rotation: 45` containing a child rectangle
+- GIVEN a `kind: 'group'` whose exact local matrix represents a 45° rotation and contains a child vector rectangle
 - WHEN exported to SVG
 - THEN the outer `<g>` carries the rotation transform
 - AND the child rectangle does not double-apply the rotation
@@ -210,43 +210,43 @@ Stroke styling MUST round-trip across `stroke`, `stroke-width`, `stroke-linecap`
 
 ### Requirement: Full Transform Parsing and Composition on Import
 
-The importer MUST parse every SVG transform variant: `translate`, `rotate`, `scale`, `skewX`, `skewY`, `matrix`, and compose nested transforms down the element tree. When the composed affine cannot be represented by Broadset's native `position` + `rotation` fields (IO-D-02 — Broadset does not carry element-level `scale` / `skew`), the importer MUST convert the shape to a path and bake the transform into the `d` attribute via `svgpath`.
+The importer MUST parse every SVG transform variant—`translate`, `rotate`, `scale`, `skewX`, `skewY`, and `matrix`—and compose nested transforms down the element tree. A finite nonsingular composed affine is stored exactly as the canonical six-value `geometry.transform.matrix`; imported vector geometry remains structured and need not destructively bake scale or skew into SVG `d` text.
 
 #### Scenario: Matrix transform on a rectangle
 
 - GIVEN SVG with `<rect transform="matrix(0.866, 0.5, -0.5, 0.866, 10, 20)" width="100" height="50"/>` (a 30° rotation plus translation)
 - WHEN imported
-- THEN the matrix is decomposed into `(translate(10, 20), rotate(30))`
-- AND the resulting element is a `rectangle` with `position: {x: 10, y: 20}` and `rotation: 30`
+- THEN the resulting element is `kind: 'vector'` with `geometryData.kind: 'rectangle'`
+- AND its exact six-value affine matrix preserves the source transform
 
 #### Scenario: Skew transform is baked to path
 
 - GIVEN SVG with `<rect transform="skewX(15)" width="100" height="50"/>`
 - WHEN imported
-- THEN the rectangle is converted to a `path` element
-- AND the `d` attribute carries the skewed geometry baked in
+- THEN the result is a vector rectangle or structured path with the exact skew matrix stored canonically
+- AND no decomposed scale/skew fields or authored SVG `d` string are added
 
 #### Scenario: Non-decomposable matrix is baked to path
 
-- GIVEN SVG with a `matrix(...)` that cannot be cleanly decomposed into translate + rotate
+- GIVEN SVG with a finite nonsingular `matrix(...)` containing reflection, scale, or skew
 - WHEN imported
-- THEN the shape is converted to a `path` and the transform is baked into `d`
-- AND the element's `rotation` is 0
+- THEN the exact affine tuple is stored without decomposition loss
+- AND geometry is mapped to the most specific canonical vector subtype
 
 #### Acceptance Criteria
 
 - [x] `translate`, `rotate`, `scale`, `skewX`, `skewY`, `matrix` all parse without throwing
 - [x] Nested group transforms compose down the element tree
-- [x] Translate-only and rotate-only matrices decompose to Broadset `position` + `rotation`
-- [x] Translate + rotate combinations decompose without information loss
-- [x] Matrices with non-trivial `scale` or `skew` bake to path geometry via `svgpath`
-- [x] Baked geometry is numerically close to the source within the rounding tolerance of `svgpath` (3 decimal places)
+- [x] Translate-only and rotate-only matrices store exact canonical affine tuples
+- [x] Translate + rotate combinations preserve the source matrix without information loss
+- [x] Matrices with non-trivial scale, reflection, or skew remain exact matrices
+- [x] Imported vector geometry uses stable structured point/segment identity where editable
 
 ---
 
 ### Requirement: Gradient Import and Export
 
-Linear, radial, and conic gradients MUST round-trip. `<linearGradient>` and `<radialGradient>` elements in `<defs>` MUST be parsed into Broadset's structured `BroadsetGradient` representation (not flattened to the first stop's colour). Conic gradients have no SVG 2 primitive; the visual layer emits a many-stop linear approximation and the true conic spec rides in `<metadata>`.
+Linear, radial, and conic gradients MUST round-trip. `<linearGradient>` and `<radialGradient>` definitions MUST parse into the closed typed gradient paint with ordered stable stops, never flattening to the first stop. Conic gradients have no SVG 2 primitive; the visual layer emits an approximation while the authoritative typed paint remains recoverable through the canonical metadata projection or interop.
 
 #### Scenario: Linear gradient round-trip
 
@@ -268,11 +268,11 @@ Linear, radial, and conic gradients MUST round-trip. `<linearGradient>` and `<ra
 
 - GIVEN an SVG from Illustrator with a `<radialGradient>` in `<defs>` with five stops
 - WHEN imported
-- THEN the resulting Broadset element carries a `BroadsetGradient` with `type: 'radial'` and all five stops — not just the first
+- THEN the resulting appearance contains a typed radial gradient paint with all five stops—not just the first
 
 #### Acceptance Criteria
 
-- [ ] `<linearGradient>` and `<radialGradient>` parse into `BroadsetGradient` with complete stop arrays
+- [ ] `<linearGradient>` and `<radialGradient>` parse into typed gradient paints with complete ordered stop arrays
 - [ ] Linear gradient angle round-trips
 - [ ] Radial gradient centre (`cx`, `cy`) and focal point round-trip
 - [ ] Conic gradients export as a linear approximation with the true spec in `<metadata>`
@@ -324,24 +324,25 @@ The exporter MUST offer a `FontEmbedChoice` option: `'embed'` (default), `'refer
 
 ### Requirement: Colour Space Preservation
 
-OKLab / OKLCH / display-p3 colours from either Broadset content or third-party imports MUST round-trip through SVG without silent downgrade to sRGB. The visual layer emits a gamut-mapped sRGB fallback; `BroadsetColor.originalColor` (per IO-D-05) is preserved in the document `<metadata>` so re-import recovers the original colour spec.
+OKLab, OKLCH, and display-p3 colors MUST round-trip without replacing authoritative typed channels with sRGB. Output MAY emit a gamut-mapped sRGB fallback alongside supported wide-gamut syntax; canonical `ColorValue` or interop source identity recovers the authoritative value.
 
 #### Scenario: OKLCH colour round-trip
 
-- GIVEN a Broadset element with `fill: { space: 'oklch', originalColor: 'oklch(70% 0.25 30)', … }`
+- GIVEN a Broadset fill whose `ColorValue` has authoritative OKLCH channels
 - WHEN exported to SVG and re-imported
-- THEN the element's `fill` carries the original `oklch(...)` representation in `originalColor`
+- THEN the typed fill retains the authoritative OKLCH channels
 - AND the visual-layer `fill=` attribute carries a gamut-mapped sRGB hex
 
 #### Scenario: Third-party display-p3 colour
 
 - GIVEN an SVG from Illustrator with `fill="color(display-p3 1 0.2 0)"`
 - WHEN imported
-- THEN the resulting element's `fill` carries `space: 'display-p3'` and `originalColor` set to the source string
+- THEN the resulting typed fill carries `space: 'display-p3'` with authoritative source channels
+- AND exact producer syntax may be retained by the SVG interop record
 
 #### Acceptance Criteria
 
-- [ ] `oklab()`, `oklch()`, and `color(display-p3 …)` round-trip via `BroadsetColor.originalColor` in the `<metadata>` packet
+- [ ] `oklab()`, `oklch()`, and `color(display-p3 …)` round-trip through typed authoritative `ColorValue` and interop source identity
 - [ ] Visual-layer colour uses the `_shared/color/gamutMap` sRGB fallback so browsers that don't support wide-gamut colour still render correctly
 - [ ] Named colours (`red`, `blue`), hex, `rgb()`, `rgba()`, and `hsl()` all parse on import via `_shared/color/toRgb`
 - [ ] Theme-slot colours resolve visually via the palette and ride in `<metadata>` as their slot reference
@@ -391,7 +392,7 @@ The SVG importer MUST sanitize input through `_shared/sanitize/sanitizeSvg` befo
 - [ ] `<script>` elements are stripped before reaching downstream code
 - [ ] `on*=` event handler attributes are stripped, including namespaced event attributes
 - [ ] Unsafe URLs in `href` / `xlink:href` / `src` are stripped; `http(s)`, fragment / relative URLs, and `data:image/*` are allowed
-- [ ] `<foreignObject>` elements are stripped by default (opaque `svg`-type preservation MAY be offered behind an explicit opt-in)
+- [ ] `<foreignObject>` never executes; safe preservation uses an inert blob, explicit preview, and diagnostic
 - [ ] DTD processing and external-entity resolution are disabled on the underlying parser
 - [ ] `<use>` / `<symbol>` follow depth is capped and cycles are detected
 - [ ] A billion-laughs entity-expansion fixture completes parsing with bounded memory
@@ -400,15 +401,15 @@ The SVG importer MUST sanitize input through `_shared/sanitize/sanitizeSvg` befo
 
 ---
 
-### Requirement: Exporter Sanitization of Opaque `svg`-Type Payloads
+### Requirement: Exporter Sanitization of Foreign SVG Payloads
 
-When a Broadset `'svg'`-type element carries raw SVG markup as its `content` (from a previous import), the exporter MUST pass that markup through `_shared/sanitize/sanitizeSvg` before embedding it in the output. This guarantees that even a hostile payload that somehow survived the importer cannot reach a downstream consumer's browser as executable markup.
+When a canonical `foreign` element uses `safeRenderMode: 'sanitized-vector'`, the exporter MUST read its inert preserved blob through the authorized blob resolver and pass markup through the shared SVG sanitizer before output. Preview-only foreign elements export a safe preview or structured intentional-loss diagnostic. Source markup is never generic element content.
 
-**Implementation status as of 2026-06-21:** The shared sanitizer strips namespaced event handlers and applies the same URL scheme policy to opaque payload re-export as the SVG importer DOM walk: `http(s)`, fragment / relative URLs, and `data:image/*` survive; `file:`, `vbscript:`, `javascript:`, and non-image `data:` payloads are removed. Verified by [`sanitize-svg.test.ts`](../../../packages/formats/src/_shared/sanitize/sanitize-svg.test.ts).
+The shared sanitizer MUST strip namespaced event handlers and apply the same URL-scheme policy to sanitized-vector foreign re-export as to importer DOM traversal: allowed `http(s)`, fragment/relative, and verified `data:image/*` references may survive; `file:`, `vbscript:`, `javascript:`, and non-image `data:` references are removed.
 
 #### Acceptance Criteria
 
-- [ ] `'svg'`-type element content is sanitized on re-emission
+- [ ] Sanitized-vector foreign source is sanitized again on re-emission
 - [ ] A round-trip of a hostile-imported SVG produces an output SVG that is itself free of `<script>`, `on*=`, namespaced event handlers, and unsafe URL schemes
 
 ---
@@ -417,8 +418,8 @@ When a Broadset `'svg'`-type element carries raw SVG markup as its `content` (fr
 
 Any SVG element or attribute that the importer cannot natively map MUST be preserved as one of:
 
-1. An opaque `svg`-type Broadset element carrying the sanitized `outerHTML` of the source fragment.
-2. A namespaced attribute on the nearest recognised ancestor.
+1. A canonical `foreign` element with inert source blob, explicit preview, safe render mode, and diagnostic.
+2. A typed interop preserved fragment targeting the nearest mapped entity.
 
 Silent drops are prohibited. Every preservation decision MUST surface as a warning in the import report describing what was preserved and why it wasn't natively mapped.
 
@@ -426,20 +427,20 @@ Silent drops are prohibited. Every preservation decision MUST surface as a warni
 
 - GIVEN an SVG with a `<rect>` and a `<foreignObject>` (with active content)
 - WHEN imported
-- THEN the `<rect>` becomes a `rectangle` element
-- AND the `<foreignObject>` is stripped (active content policy) OR preserved as an opaque `svg`-type element with sanitized markup (when active-content opt-in is off)
+- THEN the `<rect>` becomes a native vector rectangle
+- AND the `<foreignObject>` becomes a safe foreign fallback with inert source, preview, and diagnostic
 
 #### Scenario: Unknown element preservation
 
 - GIVEN an SVG with an unknown element type (e.g., a vendor-specific extension)
 - WHEN imported
-- THEN the unknown element becomes an opaque `svg`-type element with sanitized `outerHTML`
+- THEN the unknown element becomes a safe foreign fallback or typed interop preserved fragment
 - AND the import report lists the preservation
 
 #### Acceptance Criteria
 
-- [ ] Unknown SVG elements preserve as opaque `svg`-type elements
-- [ ] Unknown attributes on a recognised element preserve as namespaced attributes on that element
+- [ ] Unknown SVG elements preserve through safe foreign fallback or typed interop records
+- [ ] Unknown attributes on a recognised element preserve through a typed interop record targeting that entity
 - [ ] Preservation decisions emit warnings naming the source construct
 
 ---
@@ -452,13 +453,13 @@ Every `<g>` in the source SVG MUST produce a corresponding `'group'` element in 
 
 - GIVEN an SVG with `<g><g><rect/></g></g>` (three levels deep including the outer root)
 - WHEN imported
-- THEN the resulting Broadset elements form a `parentId` tree with two `'group'` elements and one `'rectangle'` nested inside
+- THEN the resulting Broadset elements form a `parentId` tree with two `kind: 'group'` elements and one vector rectangle nested inside
 
 #### Acceptance Criteria
 
 - [ ] Every `<g>` produces a `'group'` element with children linked via `parentId`
 - [ ] Nested group structure is preserved to arbitrary depth (up to the importer-security depth cap)
-- [ ] Group-level `transform`, `opacity`, and `style` map onto the group element's native fields
+- [ ] Group-level transform and opacity map to exact geometry and typed appearance; resolved SVG style syntax does not enter a generic canonical style bag
 
 ---
 
@@ -516,7 +517,7 @@ Covered sources (see the SVG matrix in [real-producer compatibility](../../imple
 
 - [ ] Import never throws on valid SVGs from any supported source tool
 - [ ] Tool-specific namespaces (`ai:`, `sodipodi:`, `inkscape:`) preserve as namespaced attributes on the nearest element; a warning describes them
-- [ ] Non-RGB colours from any source import without silent colour conversion (via `BroadsetColor.originalColor`)
+- [ ] Non-RGB colors import without replacing authoritative typed channels with sRGB
 - [ ] The `<use>` and `<symbol>` dereferencing path produces a visually identical group without structural round-trip guarantee
 
 ---
@@ -526,7 +527,7 @@ Covered sources (see the SVG matrix in [real-producer compatibility](../../imple
 Broadset → SVG → external editor (Illustrator, Inkscape) → save → re-import MUST preserve:
 
 - **External-editor edits** — text changes, position moves, colour changes, path edits made in the external editor appear in Broadset after re-import.
-- **Broadset semantics not touched by the external editor** — data bindings, page override maps, repeater configs, `visibleWhen` expressions (via `<metadata>` + `data-bs-*`).
+- **Broadset semantics not touched by the external editor** — stable bindings, page instances/overrides, typed repeaters, and expression ASTs through metadata/interoperability records.
 - **Untouched elements** — the preserved `<metadata>` carries the original element fingerprint; untouched elements round-trip byte-identically to the original Broadset export.
 
 #### Acceptance Criteria
@@ -535,7 +536,7 @@ Broadset → SVG → external editor (Illustrator, Inkscape) → save → re-imp
 - [ ] Fields the external editor edited appear in Broadset with the new values
 - [ ] Fields the external editor did not touch keep their Broadset-native state
 - [ ] Elements whose `data-bs-*` markers were stripped by the external editor recover identity via `fingerprintElement()` matching
-- [ ] Elements added by the external editor (new `<path>` or `<rect>` without `data-bs-*`) import as new Broadset elements on an "Imported from SVG" staging page
+- [ ] New external `<path>` or `<rect>` nodes import as new vector elements on an "Imported from SVG" staging page
 - [ ] Elements present in the preserved `<metadata>` but missing from the visual layer surface as deletions requiring user confirmation
 
 ---
@@ -561,39 +562,37 @@ Deletions require user confirmation before being dropped from the Broadset docum
 
 ### Requirement: Animated Element Static Export
 
-Broadset animations (`animations` array, keyframes) MUST be discarded on SVG export per IO-D-16. Animated elements are exported at their fully-entered "IN" state (all `in` keyframes resolved to their end positions). Animation data is NOT serialised to `<metadata>` — SVG is a static carrier from Broadset's perspective.
+Broadset lifecycle, state machines, and sequences MUST resolve into one `ResolvedSceneSnapshot` at one declared exact static-export tick before SVG export. By default, the exporter derives a single global settled-IN tick: starting from initial machine states at tick 0, it evaluates the document IN lifecycle action and chooses the latest global completion tick among every finite sequence action it starts, including reachable child clips. It then resolves the whole scene once at that global tick. If the IN action has no finite settled tick, the user MUST supply an explicit valid export tick. Runtime animation data is not serialized to `<metadata>`; SVG is a static carrier from Broadset's perspective.
 
 If the same SVG is re-imported into Broadset, the animations are NOT recovered; the user must re-author them. This is documented known-lossy behaviour.
 
 #### Scenario: Animation discarded at export
 
-- GIVEN an element with a translation animation from left to right
+- GIVEN a canonical sequence with a transform track targeting an element and selected by the document IN lifecycle action
 - WHEN SVG export runs
-- THEN the element is rendered at the end of the `in` keyframe sequence (the "IN" state)
+- THEN the whole scene is resolved once at the single global settled-IN tick and the element uses that snapshot's typed transform
 - AND no animation data appears in the exported SVG or its `<metadata>` packet
 
 #### Acceptance Criteria
 
 - [ ] Animations are discarded on export (not serialised to `<metadata>`)
 - [ ] Animated elements render at the fully-entered IN state
+- [ ] Every emitted value comes from one immutable scene snapshot resolved at one exact global tick
+- [ ] Undeclared runtime events are not applied; state machines begin in their canonical initial states before the declared lifecycle action is evaluated
+- [ ] Given unbounded IN behavior and no explicit valid tick, export fails with an actionable diagnostic
 - [ ] No SMIL `<animate>`, `<animateTransform>`, `<animateMotion>`, or `<set>` elements are emitted on export
 - [ ] Re-importing a Broadset-exported SVG surfaces an import warning that animations were lost
 
 ---
 
-### Requirement: Dirty-Flag Discipline
+### Requirement: Derived SVG Interop Cleanliness
 
-Every imported SVG element MUST land with `extensions.svg.dirty === false`. On re-export:
-
-- Untouched elements (`dirty === false`) re-emit the preserved original SVG fragment byte-for-byte.
-- Edited elements (`dirty === true`) re-emit from current Broadset state; the preservation blob is discarded.
-
-The dirty flag flips to `true` automatically when the user edits the element in Broadset via the editor middleware (IO-D-11).
+Every preserved SVG mapping MUST create an interop record with source identity, target, baseline semantic hash, and preserved fragment where applicable. Re-export derives cleanliness from semantic hash equality; no dirty boolean is persisted.
 
 #### Acceptance Criteria
 
-- [ ] Every imported element carries `extensions.svg.dirty === false`
-- [ ] Editing an element in the editor flips the flag to `true` via the dirty-flag middleware
+- [ ] Every preserved mapping has a baseline semantic hash and resolving target
+- [ ] Relevant edits change derived cleanliness; undo restoring baseline semantics restores clean status
 - [ ] Re-exporting an untouched document produces output with preserved elements identical to the source
 - [ ] Editing one element and re-exporting rewrites that element only; every other element is emitted from the preserved blob
 
@@ -639,9 +638,9 @@ This spec is authoritative for the SVG track (Phase 7). As units land, the follo
 
 - **SMIL `<animate>` emission on export.** SMIL is deprecated in modern browsers. Broadset animations ride in `.bsp` only; SVG exports render the IN state. Re-introducing SMIL emission would be a new feature behind an explicit opt-in, not a current requirement.
 - **Structural `<use>` / `<symbol>` round-trip.** Current target: dereference to inline groups on import (visually identical, structurally flattened). Reconstructing `<use>` relationships on export is not in scope for the initial track.
-- **Animated imports from third-party SMIL SVGs.** Currently SMIL is treated as static (IN state extracted via element geometry; animation commands dropped with a warning). Full SMIL parsing → Broadset `animations` mapping is a future feature.
+- **Animated imports from third-party SMIL SVGs.** Currently SMIL is treated as static (IN state extracted via resolved geometry; animation commands dropped with a warning). Full SMIL parsing into stable canonical sequences is a future feature.
 - **Pseudo-class resolution.** `css-tree` parses pseudo-classes but the importer cannot evaluate `:hover` / `:nth-child` etc. against a static tree — a warning surfaces and the selector is dropped from matching. Attribute selectors (`[attr]`, `[attr=value]`, `[attr~=word]`, `[attr|=prefix]`, `[attr^=prefix]`, `[attr$=suffix]`, `[attr*=substring]`), CSS combinators (`>`, `+`, `~`, descendant space), and `:not(<simple>)` DO resolve as of P7.7e — they no longer fall through. State pseudo-classes remain the only unresolved selector surface.
-- **Text scale / skew without `fontSources`.** The importer's glyph-flatten path (P7.7i) lays out a `<text>` element under a baking ancestor (scale / skew) into a `<path>` element pre-multiplied by the cumulative matrix when the caller supplies `importSvgDocument(svg, fileName, { fontSources: Map<family, SvgFontSource> })`. When `fontSources` is absent or doesn't carry the referenced family, the importer drops the scale/skew to a translate-only position with a warning (Broadset has no native text scale per IO-D-02). The bake is lossy by definition (font / content identity is replaced by glyph outlines) — same trade-off as the export `flatten` mode.
+- **Text outline fallback without `fontSources`.** When requested, the importer may shape `<text>` into vector structured paths using supplied font resources. Without a resolving font, it preserves exact transform and source through interop/foreign fallback and emits a diagnostic; it does not invent a lossy decomposed position or generic path string.
 
 _The following items are intentionally scoped out of the SVG track and tracked by other specs:_
 
@@ -653,7 +652,7 @@ _The following items are intentionally scoped out of the SVG track and tracked b
 ## Non-Goals
 
 - **SMIL `<animate>` / `<animateTransform>` / `<animateMotion>` / `<set>` emission on export.** SMIL is deprecated in modern browsers; Broadset animations are discarded per IO-D-16 and not re-emitted as SMIL.
-- **CSS-keyframe emission on export.** Same rationale — animations ride in `.bsp` only.
+- **CSS-keyframe emission on export.** Same rationale—canonical sequences ride in `.bsp` only.
 - **Embedded JavaScript or external script references.** `<script>` elements and `javascript:` URLs are stripped on import and never emitted on export.
 - **External CSS references (`<link rel="stylesheet">`).** External stylesheet references are not followed on import (security and determinism); inline `<style>` blocks are resolved via `css-tree`.
 - **`<foreignObject>` with active content.** Stripped on import by default. Opt-in preservation as an opaque payload is an explicit user choice, not a default.

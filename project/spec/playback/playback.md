@@ -2,44 +2,44 @@
 
 ## Purpose
 
-Defines how the system drives timeline playback in the browser, applies computed frames to the DOM, manages element state/visibility/modifier transitions, and provides the playback controller lifecycle (attach, detach, play, pause, seek, destroy).
+Defines browser scheduling for canonical sequences, typed resolved property contributions, lifecycle/state-machine transitions, exact-tick transport, DOM application, and playback-controller lifecycle.
 
 ---
 
 ## Requirements
 
-### Requirement: Timeline State Determinism Guarantee
+### Requirement: Sequence and State Determinism Guarantee
 
-At any time T on any timeline, the complete state of every element — interpolated properties, `activeState`, `modifiers`, and `visibility` — MUST be a **deterministic pure function** of the animation data alone. No playback history, no seek direction, no previously "fired" events, and no external mutable state may influence the result.
+At any exact tick T, the complete resolved scene—typed track contributions, lifecycle phase, state-machine states, instance visibility, and provenance—MUST be a deterministic pure function of canonical data, validated runtime data, the ordered typed event log, and T. Playback history, seek direction, wall-clock rounding, and previously dispatched side effects MUST NOT influence the result.
 
 This means:
 
-1. **Seeking to time T** produces the exact same element state whether T was reached by direct seek, forward playback from 0, backward seek from the end, or any arbitrary sequence of seeks.
+1. **Seeking to tick T** produces the same resolved state whether reached directly, by forward playback from zero, by backward seek, or by arbitrary seeks.
 2. **Scrubbing** (rapid seeks to arbitrary times) produces correct state at every position without gaps, glitches, or accumulated drift.
 3. **Resuming from a paused state** at time T produces the same result as a cold start that seeks directly to T.
-4. **State derivation is not event dispatch.** Keyframe action markers (`setState`, `addModifier`, `removeModifier`) are evaluated as declarative state declarations, not imperative triggers. The system evaluates all markers from t=0 to T to derive the current state — it does not "fire" events that can be missed or double-counted.
+4. **State derivation is not DOM event dispatch.** State machines replay the typed runtime event log through T and start canonical transition sequence actions at their recorded ticks. Keyframes remain typed property values and never masquerade as state actions.
 
-The implementation layer (Playback Handle) MAY track which markers have been processed for performance optimization during continuous forward playback, but this is strictly an optimization — the logical model MUST remain equivalent to full replay from t=0.
+The playback handle MAY checkpoint event-log/state-machine evaluation for forward-playback performance, but its logical result MUST remain equivalent to deterministic replay from initial states.
 
 #### Acceptance Criteria
 
-- [ ] Given any time T and any sequence of seeks to reach T, element state is always identical
-- [ ] Given a scrub across the full timeline, every sampled position produces correct state
+- [ ] Given any tick T and any sequence of seeks to reach T, resolved state is identical
+- [ ] Given a scrub across the full sequence, every sampled tick produces correct state
 - [ ] Given a pause and resume at time T, the state matches a fresh seek to T
-- [ ] Given identical animation data and time T, two independent playback instances produce identical state
+- [ ] Given identical canonical data, validated runtime data, event log, and tick T, independent playback instances produce identical state
 
 ---
 
 ### Requirement: Playback Handle Lifecycle
 
-The system MUST provide a playback handle that drives a single timeline with frame-based scheduling. The handle MUST support play, pause, seek, setSpeed, and cancel. Seek MUST clamp to `[0, durationMs]`. Cancel MUST make subsequent play calls a no-op. When playback reaches the end of the timeline (non-looping), the handle MUST invoke an optional `onComplete` callback before becoming inactive.
+The system MUST provide a playback handle that drives one canonical sequence using exact ticks. The canonical method `seekTick(tick)` accepts only safe-integer ticks in `[0, durationTicks]` and otherwise returns `time-out-of-range` without clamping. A UI/media boundary MAY expose `seekDisplayTimeMs(value)`: it clamps the display value to the sequence presentation interval, computes the exact rational `value × ticksPerSecond / 1000`, rounds to the nearest integer tick with exact half values toward the greater tick, and calls `seekTick`. Display milliseconds and `currentTimeMs` are derived views and are never serialized. The handle supports play, pause, setSpeed, and cancel. Cancel makes later play calls no-ops. A non-looping completion invokes optional `onComplete` before becoming inactive.
 
 #### Scenario: Seek clamping
 
-- GIVEN a timeline with duration 800ms
-- WHEN seeked to -100
-- THEN currentTimeMs is `0`
-- AND when seeked to 99999 then currentTimeMs is `800`
+- GIVEN `ticksPerSecond: 1000`, a sequence with `durationTicks: 800`, and the display-time seek adapter
+- WHEN display seek receives -100ms and then 99999ms
+- THEN it calls canonical seek at tick 0 and then tick 800
+- AND its displayed current time derives as 0ms and then 800ms
 
 #### Scenario: Cancel makes play a no-op
 
@@ -47,55 +47,56 @@ The system MUST provide a playback handle that drives a single timeline with fra
 - WHEN play is called
 - THEN isActive remains `false`
 
-#### Scenario: Seek derives state from all markers up to seek point
+#### Scenario: Seek derives state machines from the event log
 
-- GIVEN a timeline with setState at 100ms and addModifier at 300ms
-- WHEN seeked to 400ms
-- THEN element state reflects both markers: activeState is set and modifier is present
+- GIVEN state-machine events at ticks 100 and 300 whose transitions start referenced sequences
+- WHEN seeked to tick 400
+- THEN machine states and active transition sequence actions reflect both events
 
-#### Scenario: Forward seek applies only new state transitions to DOM
+#### Scenario: Forward seek applies only newly changed resolved targets to DOM
 
-- GIVEN a timeline with action markers at 100ms, 200ms, and 300ms
-- WHEN seeked forward from 0ms to 150ms, then seeked forward from 150ms to 250ms
-- THEN the first seek applies the 100ms marker's DOM side effects, and the second seek applies only the 200ms marker's DOM side effects
-- AND the 300ms marker is NOT applied in either seek
+- GIVEN typed state-machine events at ticks 100, 200, and 300
+- WHEN seeked from tick 0 to 150 and then to 250
+- THEN the first seek applies the resolved delta through tick 100 and the second only the changed resolved targets through tick 200
+- AND no result from tick 300 is applied
 
-> **Note:** This forward-only optimization avoids redundant DOM mutations. The derived state at any point is still equivalent to a full replay from t=0 (see Timeline State Determinism Guarantee).
+> **Note:** This optimization avoids redundant DOM writes; the derived snapshot remains equivalent to replay from initial machine states.
 
 #### Scenario: Backward seek re-derives state from scratch
 
-- GIVEN a timeline where markers at 100ms and 200ms have been applied by a forward seek to 250ms
-- WHEN seeked backward to 50ms, then seeked forward again to 250ms
+- GIVEN events at ticks 100 and 200 were evaluated by a forward seek to tick 250
+- WHEN seeked backward to tick 50 and then forward again to tick 250
 - THEN state is re-derived from t=0 at each seek position, producing the same result as a cold start
 
 #### Scenario: Seek applies styles to DOM
 
-- GIVEN a timeline with opacity keyframes from 0 to 1
-- WHEN seeked to durationMs
+- GIVEN a sequence with a typed opacity track from 0 to 1
+- WHEN seeked to `durationTicks`
 - THEN the animation target element's inline `opacity` style MUST equal the final keyframe value
 
 #### Scenario: onComplete fires when playback reaches end
 
 - GIVEN a non-looping playback handle with an `onComplete` callback
-- WHEN playback naturally reaches `durationMs`
+- WHEN playback naturally reaches `durationTicks`
 - THEN the `onComplete` callback is invoked exactly once
 - AND `isActive` is `false`
 
 #### Scenario: onComplete does not fire on cancel
 
 - GIVEN an active playback handle with an `onComplete` callback
-- WHEN the handle is cancelled before reaching durationMs
+- WHEN the handle is cancelled before reaching `durationTicks`
 - THEN the `onComplete` callback is NOT invoked
 
 #### Acceptance Criteria
 
-- [ ] Given a timeline with duration 800ms, currentTimeMs is `0` and when seeked to 99999 then currentTimeMs is `800`
+- [ ] Given the display-time seek adapter, clamping occurs before one deterministic conversion to a canonical tick
+- [ ] Given `seekTick` outside the sequence range, evaluation returns `time-out-of-range` without clamping
 - [ ] Given a cancelled handle, isActive remains `false`
-- [ ] Given a timeline with setState at 100ms and addModifier at 300ms, seeking to 400ms reflects both markers in element state
-- [ ] Given sequential forward seeks, each seek applies only the markers between the previous and current position to the DOM
+- [ ] Given state-machine events through the requested tick, seeking derives the correct states and transition sequence actions
+- [ ] Given sequential forward seeks, each seek applies only changed resolved targets while remaining equivalent to cold evaluation
 - [ ] Given a backward seek followed by a forward seek, state is re-derived from t=0 producing identical results to a cold start
-- [ ] Given a timeline with opacity keyframes, seeking to the end results in the target element's inline style reflecting the final opacity value
-- [ ] Given a non-looping handle with onComplete, the callback fires exactly once when playback reaches durationMs
+- [ ] Given a typed opacity track, terminal seek applies the final resolved opacity
+- [ ] Given a non-looping handle with onComplete, the callback fires exactly once at `durationTicks`
 - [ ] Given a cancelled handle with onComplete, the callback is NOT invoked
 
 ---
@@ -141,232 +142,230 @@ The style writer MUST NOT re-query the DOM for sub-targets (content element, opa
 
 ### Requirement: Playback Controller DOM Observation
 
-The system MUST observe DOM mutations on attached elements and initiate state/visibility/modifier transitions based on derived state. Elements starting `offscreen` MUST be hidden. The controller MUST support attach, detach, play, pause, seek, setSpeed, and destroy.
+The system MUST observe its attached rendered-scene roots for host lifecycle changes while treating the resolved snapshot—not arbitrary DOM classes—as state truth. Typed page-instance visibility, lifecycle phase, and state-machine evaluation determine painted/interactive output. The controller supports attach, detach, play, pause, exact-tick seek, display-time seek conversion, setSpeed, and destroy.
 
 #### Scenario: Offscreen element is hidden on attach
 
-- GIVEN an element with class `offscreen`
+- GIVEN a resolved page instance whose effective `visible` value is false
 - WHEN the playback controller attaches
 - THEN the element has `visibility:hidden` and `pointer-events:none`
 
 #### Scenario: Registry update refreshes runtime
 
 - GIVEN an attached playback controller
-- WHEN `setRegistry` is called with a new registry
-- THEN element runtimes are re-parsed
+- WHEN a new validated resolved-scene snapshot and sequence registry are supplied
+- THEN runtime targets and canonical sequence/state-machine references are refreshed
 
 #### Scenario: SeekTimeline creates and cleans up handles
 
-- GIVEN a timeline named `spin` on an element
-- WHEN seekTimeline is called then stopTimeline is called
+- GIVEN a sequence with stable ID `seq-spin`
+- WHEN its playback handle is sought and then stopped by stable ID
 - THEN no errors occur and handles are cleaned up
 
 #### Acceptance Criteria
 
-- [ ] Given an element with class `offscreen`, the element has `visibility:hidden` and `pointer-events:none`
-- [ ] Given an attached playback controller, element runtimes are re-parsed
-- [ ] Given a timeline named `spin` on an element, no errors occur and handles are cleaned up
+- [ ] Given effective instance visibility false, output has `visibility:hidden` and `pointer-events:none`
+- [ ] Given a new resolved snapshot, runtime targets and canonical references refresh
+- [ ] Given a sequence addressed by stable ID, seek/stop cleans up its handle
 
 ---
 
 ### Requirement: Suppress Transitions Mode
 
-The system MUST support a `suppressTransitions` flag that applies state and modifier snapshots instantly without animation.
+The system MUST support a runtime `suppressTransitions` flag that applies the target state-machine/lifecycle resolved snapshot instantly without playing transition sequence actions.
 
 #### Scenario: Instant state snapshot
 
 - GIVEN `suppressTransitions = true`
-- WHEN an element's class changes to a state with property keyframes
-- THEN the final keyframe properties are applied instantly to the DOM
+- WHEN a typed event transitions a state machine to a state with a sequence action
+- THEN the transition sequence's terminal resolved properties are applied instantly
 
 #### Acceptance Criteria
 
-- [ ] Given `suppressTransitions = true`, the final keyframe properties are applied instantly to the DOM
+- [ ] Given suppressed transitions, the target state and terminal typed properties apply without time progression
 
 ---
 
-### Requirement: Visibility and State Transitions
+### Requirement: Lifecycle and State-Machine Transitions
 
-The system MUST animate visibility changes using bound IN/OUT timelines. When no timeline is bound, the system MUST fall back to direct CSS. State changes MUST stop previous state controls before playing the new timeline.
+The system MUST animate lifecycle changes through canonical IN/HOLD-UPDATE/OUT sequence references and state-machine changes through transition sequence actions. When no lifecycle sequence is declared, effective instance visibility applies directly. When a transition supersedes an incompatible active transition action on the same target/property, deterministic resolution stops or overrides the earlier control according to canonical precedence.
 
-#### Scenario: Onscreen plays IN timeline
+#### Scenario: Becoming visible plays lifecycle IN sequence
 
-- GIVEN visibility changes from offscreen to onscreen
-- WHEN no activeState is set
-- THEN the IN state timeline is played
+- GIVEN effective page-instance visibility changes from false to true and lifecycle IN references `seq-in`
+- WHEN runtime lifecycle input enters IN
+- THEN `seq-in` plays from the exact transition tick
 
-#### Scenario: No timeline falls back to CSS
+#### Scenario: No lifecycle sequence applies visibility directly
 
-- GIVEN no state timeline bindings exist
-- WHEN visibility changes to offscreen
+- GIVEN no lifecycle OUT sequence is declared
+- WHEN effective instance visibility becomes false
 - THEN `visibility:hidden` is set directly
 
 #### Scenario: Unchanged visibility is a no-op
 
 - GIVEN visibility remains onscreen
 - WHEN transitions are checked
-- THEN no timeline is played
+- THEN no sequence action starts
 
-#### Scenario: OUT timeline completion hides element
+#### Scenario: OUT sequence completion hides output
 
-- GIVEN an element transitioning from onscreen to offscreen with a bound OUT timeline
-- WHEN the OUT timeline animation finishes (non-suppress mode)
+- GIVEN lifecycle OUT references a finite sequence
+- WHEN that sequence reaches its terminal tick
 - THEN the element MUST have `visibility:hidden` and `pointer-events:none`
 
-#### Scenario: State cleared to null stops active timeline
+#### Scenario: State transition supersedes prior action
 
-- GIVEN an element with an active state timeline playing
-- WHEN the state class is removed (activeState transitions to null)
-- THEN the active timeline MUST be stopped and applied styles cleaned up
+- GIVEN a state-machine transition sequence is active
+- WHEN a later eligible transition changes state and targets the same properties
+- THEN prior incompatible contributions are stopped/overridden and resolved styles are updated from canonical precedence
 
 #### Acceptance Criteria
 
-- [ ] Given visibility changes from offscreen to onscreen, the IN state timeline is played
-- [ ] Given no state timeline bindings exist, `visibility:hidden` is set directly
-- [ ] Given visibility remains onscreen, no timeline is played
-- [ ] Given an OUT timeline that finishes playing, the element has `visibility:hidden` and `pointer-events:none`
-- [ ] Given an active state timeline and state cleared to null, the timeline is stopped and styles are cleaned up
+- [ ] Given lifecycle enters IN with a sequence reference, that sequence starts at the exact transition tick
+- [ ] Given no lifecycle animation reference, effective visibility applies directly
+- [ ] Given unchanged lifecycle/visibility input, no sequence starts
+- [ ] Given OUT sequence completion, output becomes hidden and non-interactive
+- [ ] Given a superseding transition, incompatible earlier contributions are cleaned up deterministically
 
 ---
 
-### Requirement: Modifier Sync
+### Requirement: Independent State-Machine Sync
 
-The system MUST play modifier in-timelines when added and out-timelines when removed. When no out-timeline exists, the modifier control MUST be stopped.
+Friendly independent “modifier” toggles MUST compile to canonical two-state machines with typed activation/deactivation triggers and optional transition sequence actions. Activation plays the transition-to-active sequence action; deactivation plays the transition-to-inactive action or stops the active action when none is declared. No modifier set or in/out timeline binding is serialized.
 
-#### Scenario: Modifier added plays in-timeline
+#### Scenario: Friendly toggle activation plays transition sequence
 
-- GIVEN modifier `pulse` is added
-- WHEN it was not previously active
-- THEN the pulse in-timeline is played
+- GIVEN the `pulse` state machine receives its activation trigger
+- WHEN it transitions from inactive to active
+- THEN its transition-to-active sequence action plays
 
-#### Scenario: Modifier removed stops control
+#### Scenario: Friendly toggle deactivation stops control
 
-- GIVEN modifier `pulse` is removed and has no out-timeline
+- GIVEN `pulse` receives its deactivation trigger and that transition has no sequence action
 - WHEN sync runs
-- THEN the modifier control is stopped
+- THEN the active transition sequence control is stopped
 
 #### Acceptance Criteria
 
-- [ ] Given modifier `pulse` is added, the pulse in-timeline is played
-- [ ] Given modifier `pulse` is removed and has no out-timeline, the modifier control is stopped
+- [ ] Given activation, the canonical transition-to-active action plays
+- [ ] Given deactivation with no action, the active control stops
 
 ---
 
-### Requirement: State and Modifier Timeline Resolution
+### Requirement: Lifecycle and State-Machine Sequence Resolution
 
-The system MUST resolve state and modifier timelines from the animations array using a two-step lookup:
+The system MUST resolve lifecycle and state-machine sequence references using stable IDs:
 
-1. **Find binding by name:** Match the requested state/modifier name against the binding's `stateName` or `modifierName`.
-2. **Find timeline by ID:** Use the binding's `timelineId` to locate the timeline, matching against both `id` and `name` fields.
+1. **Find canonical owner/action:** Resolve the lifecycle phase or state-machine transition by stable identity and typed trigger.
+2. **Find sequence by ID:** Resolve only the stable `sequenceId`; display names are not identity fallbacks.
 
-Unknown states or modifiers (no matching binding) MUST return null. Missing timeline references (binding exists but timeline not found) MUST also return null.
+Unknown runtime events that match no transition cause no state change. A persisted lifecycle/transition action whose sequence ID does not resolve is a semantic-validation error and cannot reach playback.
 
-For modifier bindings, the system MUST support separate `inTimeline` and `outTimeline` references. When no `outTimeline` is defined, removing the modifier MUST stop the in-timeline control.
+Independent two-state machines MAY declare different sequence actions on activation and deactivation transitions. Missing optional deactivation action means stop/settle without inventing a sequence.
 
-#### Scenario: Resolve IN state timeline
+#### Scenario: Resolve lifecycle IN sequence
 
-- GIVEN a registry with an IN state binding pointing to timeline `tl-enter`
-- WHEN the IN state timeline is resolved
-- THEN the correct timeline is returned
+- GIVEN lifecycle IN references sequence `seq-enter`
+- WHEN the IN action is resolved
+- THEN the exact sequence is returned by stable ID
 
-#### Scenario: Unknown state returns null
+#### Scenario: No eligible transition leaves state unchanged
 
-- GIVEN a request for state `UNKNOWN`
+- GIVEN a typed event for which no state-machine transition is eligible
 - WHEN resolved
 - THEN the result is null
 
-#### Scenario: Timeline matched by name fallback
+#### Scenario: Display name is not an identity fallback
 
-- GIVEN a binding with `timelineId: 'entrance'` and a timeline with `name: 'entrance'` but `id: 'tl-001'`
+- GIVEN an action whose `sequenceId` is stale but a sequence display name happens to match
 - WHEN resolved
-- THEN the timeline is found via name match
+- THEN semantic validation rejects the stale reference before playback
 
 #### Acceptance Criteria
 
-- [ ] Given a registry with an IN state binding, the correct timeline is returned
-- [ ] Given a request for state `UNKNOWN`, the result is null
-- [ ] Given a binding referencing a timeline by name (not id), the timeline is found via name match
-- [ ] Given a modifier binding with no outTimeline, removing the modifier stops the in-timeline control
+- [ ] Given lifecycle IN with a resolving stable sequence ID, the correct sequence is returned
+- [ ] Given no eligible transition, state remains unchanged and no action sequence is resolved
+- [ ] Given a persisted binding with a stale or name-only sequence reference, semantic validation rejects it before playback
+- [ ] Given a two-state machine deactivation without an action, the active control stops
 
 ---
 
-### Requirement: Keyframe Action Discrimination
+### Requirement: State-Machine Transition Actions
 
-The system MUST support three keyframe action types as **declarative state markers** that define element runtime state at points along the timeline:
+State-machine transitions MAY contain canonical sequence actions addressed by stable sequence ID. Transition actions begin at the exact event tick after trigger/guard/priority selection. Keyframes MUST contain only type-compatible property values and interpolation; they MUST NOT contain state-changing actions.
 
-- **setState:** Declares the element's runtime `activeState` as the action's payload string (or null if no payload) from this point forward.
-- **addModifier:** Declares the payload string as present in the element's runtime `modifiers` set from this point forward.
-- **removeModifier:** Declares the payload string as absent from the element's runtime `modifiers` set from this point forward.
+#### Scenario: Transition starts sequence action
 
-When seeking to a time position, the system MUST derive the element's state by evaluating all action markers from t=0 to the seek point in chronological order. This is a pure derivation — not event dispatch. See the Timeline State Determinism Guarantee.
+- GIVEN a transition from `idle` to `highlighted` whose action references `seq-highlight`
+- WHEN its typed trigger is recorded at tick 500
+- THEN the machine enters `highlighted` and `seq-highlight` starts at tick 500
 
-#### Scenario: setState declares active state
+#### Scenario: Multiple state machines derive independently
 
-- GIVEN a keyframe at 500ms with action `setState` and payload `highlighted`
-- WHEN state is derived at 500ms or later
-- THEN the element's runtime `activeState` is `highlighted`
+- GIVEN independent state machines whose transition actions reference `seq-pulse` and `seq-active`
+- WHEN their ordered triggers have occurred by tick 750
+- THEN both machine states and both active sequence schedules derive deterministically
 
-#### Scenario: State derived from multiple markers
+#### Scenario: Action in keyframe rejected
 
-- GIVEN keyframes: `addModifier('pulse')` at 0ms, `setState('active')` at 500ms, `removeModifier('pulse')` at 1000ms
-- WHEN state is derived at 750ms
-- THEN `activeState` is `active` and `modifiers` contains `pulse`
+- GIVEN a keyframe containing a state/action payload instead of a typed track value
+- WHEN structural validation runs
+- THEN validation fails at the keyframe
 
 #### Acceptance Criteria
 
-- [ ] Given a setState marker, the element's runtime activeState is set to the payload from that point forward
-- [ ] Given an addModifier marker, the payload is present in the element's runtime modifiers from that point forward
-- [ ] Given a removeModifier marker, the payload is absent from the element's runtime modifiers from that point forward
-- [ ] Given a seek to a time point, all markers from t=0 to the seek point are evaluated in chronological order
+- [ ] Transition actions reference sequences by stable ID and start at the exact event tick
+- [ ] Independent state machines derive deterministically from the same ordered event log
+- [ ] Keyframe action payloads are structurally rejected
+- [ ] Direct seek and sequential evaluation produce the same transition-action schedule
 
 ---
 
 ### Requirement: State Transition Anti-Cascade
 
-When a state or modifier change triggers a bound timeline (e.g., the IN timeline plays when an element becomes visible), that triggered timeline MUST NOT contain keyframe action markers (`setState`, `addModifier`, `removeModifier`) that target the same element. This prevents recursive state transitions and ensures the state derivation remains a simple linear scan with no cascading side effects.
+State-machine and lifecycle sequence-action dependency graphs MUST be deterministic and acyclic where an action could synchronously retrigger its owning transition without an intervening typed runtime event. Sequence tracks cannot mutate state-machine state; cross-entity property targeting remains valid when property target validation succeeds.
 
-Cross-element targeting (a keyframe with an explicit `target` pointing to a different element) is permitted in triggered timelines, as it does not create recursion.
+#### Scenario: Recursive transition-action dependency rejected
 
-#### Scenario: Triggered timeline with self-targeting action marker rejected
-
-- GIVEN a state-triggered timeline containing a `setState` action marker targeting the owner element
-- WHEN the animation data is validated
+- GIVEN lifecycle/state-machine actions forming a synchronous dependency cycle
+- WHEN semantic validation runs
 - THEN validation fails with an error identifying the circular dependency
 
-#### Scenario: Cross-element action markers in triggered timelines allowed
+#### Scenario: Cross-element property tracks allowed
 
-- GIVEN a state-triggered timeline containing a `setState` action marker targeting a different element
-- WHEN the animation data is validated
+- GIVEN a transition sequence with a typed property track targeting a different element
+- WHEN semantic validation runs
 - THEN validation succeeds
 
 #### Acceptance Criteria
 
-- [ ] Given a state-triggered timeline with a self-targeting action marker, validation fails
-- [ ] Given a state-triggered timeline with a cross-element action marker, validation succeeds
-- [ ] Given a modifier-triggered timeline with a self-targeting action marker, validation fails
+- [ ] Given a synchronous action dependency cycle, semantic validation fails
+- [ ] Given a valid cross-entity property target, semantic validation succeeds
+- [ ] Sequence tracks cannot encode state-machine transitions as keyframe values
 
 ---
 
-### Requirement: Class State Parsing
+### Requirement: DOM State Signal Boundary
 
-The system MUST parse element visibility, active state, and modifiers from both CSS classes and data attributes. Data-attribute paths take precedence when `data-visibility` is set.
+When host integration uses DOM classes or data attributes as controls, the adapter MUST parse them into typed runtime lifecycle/state-machine events and effective page-instance visibility inputs. Parsed tokens are boundary signals only: they MUST NOT become canonical keyframe actions, modifier sets, or element visibility fields. Explicit `data-visibility` takes precedence over compatibility class signals at this boundary.
 
 #### Scenario: Data-attribute visibility
 
 - GIVEN an element with `data-visibility="onscreen"`
 - WHEN class state is parsed
-- THEN visibility is `onscreen`
+- THEN the adapter emits effective visibility true
 
 #### Scenario: Class-based state detection
 
-- GIVEN an element with class `onscreen IN glow`
-- WHEN parsed against a registry with matching bindings
-- THEN visibility=onscreen, activeState=IN, modifiers={glow}
+- GIVEN an element with class tokens `onscreen IN glow`
+- WHEN parsed against configured lifecycle and state-machine trigger mappings
+- THEN the adapter emits visibility true plus typed IN/glow events
 
 #### Acceptance Criteria
 
-- [ ] Given an element with `data-visibility="onscreen"`, visibility is `onscreen`
-- [ ] Given an element with class `onscreen IN glow`, visibility=onscreen, activeState=IN, modifiers={glow}
+- [ ] Given `data-visibility="onscreen"`, the adapter emits effective visibility true
+- [ ] Given configured class tokens, the adapter emits typed runtime events without persisting token strings
 
 ---
 
@@ -388,17 +387,17 @@ The system MUST escape element IDs for safe use in CSS attribute selectors. Simp
 
 ### Requirement: Playback Loop Progression
 
-The system MUST continue timeline playback across timeline-end boundaries when looping is enabled, without entering a stopped state.
+The system MUST continue sequence playback across `durationTicks` boundaries when canonical looping is enabled, without entering a stopped state.
 
 #### Scenario: Looping playback wraps and continues
 
-- GIVEN a looping timeline playback session
-- WHEN playback reaches the configured timeline end
+- GIVEN a looping sequence playback session
+- WHEN transport reaches the sequence `durationTicks`
 - THEN playback position wraps to the beginning and continues running
 
 #### Acceptance Criteria
 
-- [ ] Given a looping timeline playback session, playback position wraps to the beginning and continues running
+- [ ] Given a looping sequence session, exact tick mapping wraps and playback continues
 
 ---
 
@@ -427,82 +426,82 @@ The system MUST support on-demand settle timing that defers final settled state 
 
 ### Requirement: Playback Speed Multiplier
 
-The system MUST scale playback progression rate by the configured speed factor. At speed 1.0, wall-clock time and playback time advance at the same rate. At speed 2.0, each unit of wall-clock time advances playback time by two units.
+The system MUST scale transport progression by the configured runtime speed factor. Wall-clock deltas are converted to an exact accumulated rational tick delta using the document timebase; fractional remainder stays runtime-only and MUST NOT enter canonical data. At speed 1.0, 100ms of wall clock advances by the exact tick equivalent; at speed 2.0 it advances twice that number of ticks.
 
 #### Scenario: Speed change increases progression rate
 
 - GIVEN active playback at speed 1.0 where 100ms of wall-clock time advances playback by 100ms
 - WHEN speed is changed to 2.0
-- THEN 100ms of wall-clock time advances playback by 200ms
+- THEN 100ms of wall-clock time advances transport by the exact tick equivalent of 200ms
 
 #### Acceptance Criteria
 
-- [ ] Given playback at speed 1.0, 100ms of wall-clock time advances playback by 100ms
-- [ ] Given playback at speed 2.0, 100ms of wall-clock time advances playback by 200ms
+- [ ] Given speed 1.0, wall-clock delta converts through the timebase to exact transport ticks
+- [ ] Given speed 2.0, transport advances twice the exact tick delta with no canonical fractional tick
 
 ---
 
-### Requirement: Simultaneous Timeline Playback
+### Requirement: Simultaneous Sequence Playback
 
-Multiple timelines MAY play simultaneously on different elements. However, only one timeline MAY be active on a given element at any time. If a new timeline starts on an element that already has an active timeline, the existing timeline MUST be cancelled before the new one begins. The cancellation MUST invoke the cancelled timeline's cleanup, removing applied styles and restoring defaults.
+Multiple sequences MAY be active simultaneously. Contributions to distinct stable property targets are independent. When incompatible active tracks target the same property, canonical lifecycle/state/sequence precedence and transition replacement policy select the effective contribution; replacing a runtime control cleans up its DOM writes before the new resolved value applies.
 
-#### Scenario: New timeline cancels existing timeline on same element
+#### Scenario: New sequence supersedes an incompatible contribution
 
-- GIVEN element A is playing timeline X
-- WHEN timeline Y starts on element A
-- THEN timeline X is cancelled and timeline Y begins
+- GIVEN sequence X contributes to a target property on element A
+- WHEN a superseding transition starts sequence Y on the same target
+- THEN X's runtime control is replaced and Y becomes effective under canonical precedence
 
-#### Scenario: Timelines on different elements are independent
+#### Scenario: Sequences targeting different elements are independent
 
-- GIVEN element A is playing timeline X and element B is playing timeline Y
+- GIVEN sequence X targets element A and sequence Y targets element B
 - WHEN both play simultaneously
-- THEN both timelines run independently without interference
+- THEN both sequences run independently without interference
 
-#### Scenario: Cancelled timeline cleanup is invoked
+#### Scenario: Replaced sequence-control cleanup is invoked
 
-- GIVEN element A is playing timeline X with applied styles
-- WHEN timeline Y starts on element A and timeline X is cancelled
-- THEN timeline X's applied styles are removed before timeline Y begins
+- GIVEN sequence X has applied a resolved target value
+- WHEN a superseding transition replaces X with Y on that target
+- THEN X's DOM contribution is cleaned before Y's resolved value applies
 
 #### Acceptance Criteria
 
-- [ ] Given a new timeline starting on an element with an active timeline, the existing timeline is cancelled first
-- [ ] Given timelines on different elements, they play independently without interference
-- [ ] Given a cancelled timeline, applied styles are cleaned up before the new timeline starts
+- [ ] Given incompatible contributions to one target, canonical precedence/replacement selects one effective value
+- [ ] Given sequences on independent targets, they play without interference
+- [ ] Given a replaced control, its DOM contribution is cleaned before the new value applies
 
 ---
 
 ### Requirement: Loop and Ping-Pong Playback
 
-When a timeline with `loop: 'loop'` or `loop: 'ping-pong'` is playing, the playback engine MUST continue advancing past the base duration according to the loop mode. On each animation frame, the playback engine maps the elapsed time to the effective position within the current loop iteration (see timeline computation spec). When the loop `loopCount` is reached, the playback handle MUST fire its `onComplete` callback and stop. When `loopCount` is `null` (infinite), the playback continues until explicitly cancelled. In `'ping-pong'` mode, the style writer MUST reverse the interpolation direction on odd iterations — all animated properties smoothly reverse. The settle timer MUST NOT fire between loop iterations; it fires only after the final iteration completes (or not at all for infinite loops).
+When a sequence's closed loop definition requests loop or ping-pong playback, transport MUST map exact elapsed ticks to exact sequence ticks as defined in [timeline.md](timeline.md). A finite count fires `onComplete` once after the final iteration; an unbounded loop continues until cancellation. Ping-pong reverses odd iterations. The runtime settle timer does not fire between iterations.
 
 #### Scenario: Loop restarts seamlessly
 
-- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: 2`
+- GIVEN a playing sequence with loop mode and count 2
 - WHEN the first iteration completes
-- THEN the timeline immediately restarts from offset 0 without a visible gap
+- THEN the sequence immediately restarts from tick 0 without a visible gap
 
 #### Scenario: Ping-pong reverses smoothly
 
-- GIVEN a playing timeline with `loop: 'ping-pong'` and `loopCount: 2`
+- GIVEN a playing sequence with ping-pong mode and count 2
 - WHEN the first forward pass completes
 - THEN the second iteration plays in reverse (properties animate from end values back to start values)
 
 #### Scenario: Finite loop completion
 
-- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: 3`
+- GIVEN a playing sequence with loop mode and count 3
 - WHEN all 3 iterations complete
 - THEN the `onComplete` callback fires and playback stops
 
 #### Scenario: Infinite loop never auto-completes
 
-- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: null`
+- GIVEN a playing sequence with an unbounded loop
 - WHEN playback has run for 100 iterations
 - THEN playback continues; `onComplete` has not fired
 
 #### Scenario: Settle timer on loop completion
 
-- GIVEN a playing timeline with `loop: 'loop'` and `loopCount: 2`
+- GIVEN a playing sequence with loop mode and count 2
 - WHEN both iterations complete
 - THEN the settle timer fires after the final iteration (not between iterations)
 
@@ -510,9 +509,9 @@ When a timeline with `loop: 'loop'` or `loop: 'ping-pong'` is playing, the playb
 
 - [ ] Given loop mode with finite count, playback restarts seamlessly between iterations
 - [ ] Given ping-pong mode, odd iterations reverse the interpolation direction
-- [ ] Given `loopCount: N`, `onComplete` fires exactly once after N iterations
-- [ ] Given `loopCount: null`, playback continues indefinitely until cancelled
-- [ ] Given a looping timeline, the settle timer fires only after the final iteration
+- [ ] Given a finite loop count N, `onComplete` fires exactly once after N iterations
+- [ ] Given an unbounded loop, playback continues until cancelled
+- [ ] Given a looping sequence, the settle timer fires only after the final iteration
 
 ---
 
@@ -520,13 +519,13 @@ When a timeline with `loop: 'loop'` or `loop: 'ping-pong'` is playing, the playb
 
 - [x] **Style Writer Target Routing — fallback to container:** Automated test coverage now exists.
 - [x] **Settle Timer Behavior — reset on mutation:** Automated test coverage now exists.
-- [x] **Simultaneous Timeline Playback:** Automated tests now cover single-element cancellation-on-replacement, style cleanup, and multi-element independence.
-- [x] **Visibility transition post-animation:** When an OUT timeline finishes playing (non-suppress mode), the element becomes hidden. Covered via `onComplete` callback.
-- [x] **State cleared to null:** When `activeState` transitions from a named state to `null`, the previous state's timeline control is stopped and applied styles are cleaned up. Automated test coverage exists.
+- [x] **Simultaneous sequence playback:** Automated tests cover replacement cleanup and independent targets.
+- [x] **Visibility transition post-animation:** When a lifecycle OUT sequence completes, output becomes hidden. Covered via `onComplete`.
+- [x] **Superseding state transition:** When a later transition replaces an active sequence action on the same target, the previous control is stopped and DOM contributions are cleaned.
 
 ---
 
 ## Non-Goals
 
 - Easing math and value interpolation → see [interpolation.md](interpolation.md)
-- Timeline computation → see [timeline.md](timeline.md)
+- Sequence computation → see [timeline.md](timeline.md)

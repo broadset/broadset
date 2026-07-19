@@ -122,7 +122,7 @@ Every spec scenario where a user action in one UI region produces a visible outc
 ### Timeline
 
 - [ ] **Keyframe drag:** Dragging a keyframe marker MUST reposition it to a new time offset with visual feedback during drag.
-- [ ] **Keyframe deletion:** Pressing Delete on a selected keyframe MUST remove it; deleting the last keyframe MUST remove the timeline entry.
+- [ ] **Keyframe deletion:** Pressing Delete on a selected keyframe MUST remove it by stable ID; deleting the last keyframe MUST remove the now-empty property track without changing unrelated tracks or the owning sequence.
 
 ### Modals
 

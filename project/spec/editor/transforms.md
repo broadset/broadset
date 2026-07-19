@@ -162,31 +162,31 @@ Drag, resize, and rotate deltas MUST be divided by the current zoom level so can
 
 ### Requirement: Border Radius Handle Interaction
 
-Rectangle elements MUST show corner-radius handles when selected. Dragging a handle adjusts `borderRadius`. Handles MUST NOT appear for non-rectangle element types (ellipse, image, text, etc.).
+Vector rectangle elements MUST show corner-radius handles when selected. Dragging a handle adjusts typed `geometryData.cornerRadii`. Handles MUST NOT appear for other vector subtypes or element kinds.
 
 #### Scenario: Handles appear for rectangle
 
-- GIVEN a selected rectangle element
+- GIVEN a selected vector rectangle
 - WHEN the selection is inspected
 - THEN corner-radius handles are visible
 
 #### Scenario: Handles hidden for ellipse
 
-- GIVEN a selected ellipse element
+- GIVEN a selected vector ellipse
 - WHEN the selection is inspected
 - THEN no corner-radius handles are visible
 
 #### Scenario: Drag adjusts radius
 
-- GIVEN a rectangle with borderRadius 0
+- GIVEN a vector rectangle with `cornerRadii: [0, 0, 0, 0]`
 - WHEN a corner-radius handle is dragged inward
-- THEN borderRadius increases
+- THEN the addressed corner-radius value increases
 
 #### Acceptance Criteria
 
-- [ ] Given a selected rectangle, corner-radius handles appear
-- [ ] Given a selected non-rectangle element, corner-radius handles do not appear
-- [ ] Given a corner-radius handle drag, borderRadius is adjusted
+- [ ] Given a selected vector rectangle, corner-radius handles appear
+- [ ] Given any other kind/subtype, corner-radius handles do not appear
+- [ ] Given a corner-radius handle drag, typed `cornerRadii` are adjusted
 
 ---
 

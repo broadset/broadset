@@ -142,29 +142,30 @@ The editor error boundary MUST catch rendering errors in the editor tree and dis
 
 ---
 
-### Requirement: Timeline Playback Hook
+### Requirement: Sequence Preview Playback Hook
 
-The timeline playback hook MUST provide play, pause, seek, stop, and current-time state for timeline animation preview in the editor.
+The sequence preview hook MUST provide play, pause, exact-tick seek, stop, and current-tick state for a canonical sequence selected in TimelineEditor. Commands MUST use the stable owner/sequence address from editing context; sequence names and selected elements MUST NOT serve as identity fallbacks. Seconds or timecode are derived display values only.
 
 #### Scenario: Play and pause
 
-- GIVEN a document with animation timelines
+- GIVEN a document with canonical sequences
 - WHEN play is invoked via the hook
-- THEN the animation plays and current time advances
+- THEN the selected sequence plays and current tick advances
 - WHEN pause is invoked
-- THEN the animation pauses at the current time
+- THEN the sequence pauses at the current tick
 
-#### Scenario: Seek to offset
+#### Scenario: Seek to exact tick
 
-- GIVEN a playing animation
-- WHEN seek is invoked with a specific time offset
-- THEN the animation jumps to that offset
+- GIVEN a playing sequence
+- WHEN `seekTick` is invoked with a valid exact tick
+- THEN the sequence preview evaluates at that tick
 
 #### Acceptance Criteria
 
-- [ ] Given a play command, the animation starts and current time advances
-- [ ] Given a pause command, the animation stops at the current time
-- [ ] Given a seek command, the animation jumps to the specified time
+- [ ] Given a stable owner/sequence address and play command, that sequence starts and current tick advances
+- [ ] Given a pause command, sequence preview pauses at the current tick
+- [ ] Given `seekTick`, sequence preview evaluates at the specified exact tick
+- [ ] Given a stale stable ID, no name fallback or element-local lookup occurs
 
 ---
 

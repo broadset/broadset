@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the per-type capability flags that control which editing features and style properties are available for each element type. These flags drive UI panel visibility, handle rendering, and constraint enforcement. This spec ensures any consumer can determine what editing features apply to any element type. It does NOT cover how capabilities are rendered in UI (→ `project/spec/ui/panels.md`) or how plugins override capabilities (→ `project/spec/renderer/spec.md`). See [conventions](../../README.md).
+Defines runtime capability flags derived from canonical element `kind` and, for vectors, `geometryData.kind`. Flags drive UI visibility and command availability but are never persisted and never replace structural or semantic validation.
 
 ---
 
@@ -10,7 +10,7 @@ Defines the per-type capability flags that control which editing features and st
 
 ### Requirement: Capability Flag Set
 
-Every element type MUST resolve to a capability profile containing exactly these boolean flags: `borderRadius`, `typography`, `appearance`, `boxEffects`, `clipPath`, `objectFit`, `svgStrokeFill`, `pathEditing`, `squareConstrained`, `instantPlace`.
+Every element MUST resolve to a capability profile containing exactly these boolean flags: `borderRadius`, `typography`, `appearance`, `boxEffects`, `clipPath`, `objectFit`, `vectorStrokeFill`, `pathEditing`, `squareConstrained`, `instantPlace`. The historical UI label `clipPath` authors typed `appearance.clip`; it never stores CSS clip text.
 
 #### Scenario: Profile shape
 
@@ -37,41 +37,41 @@ Text elements MUST enable: borderRadius, typography, appearance, boxEffects. All
 #### Acceptance Criteria
 
 - [ ] Given a text element, borderRadius, typography, appearance, and boxEffects are enabled
-- [ ] Given a text element, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given a text element, clipPath, objectFit, vectorStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
 
 ---
 
-### Requirement: Rectangle Element Capabilities
+### Requirement: Vector Rectangle Capabilities
 
-Rectangle elements MUST enable: borderRadius, appearance, boxEffects, clipPath. All other flags MUST be disabled.
+Vector elements with `geometryData.kind: 'rectangle'` MUST enable borderRadius, appearance, boxEffects, and clipPath. All other flags MUST be disabled. Border-radius controls edit typed `cornerRadii`; clipPath controls edit typed `appearance.clip`.
 
 #### Scenario: Rectangle capabilities
 
-- GIVEN an element of type `rectangle`
+- GIVEN `kind: 'vector'` with `geometryData.kind: 'rectangle'`
 - WHEN its capability profile is resolved
 - THEN borderRadius, appearance, boxEffects, clipPath are true; all others are false
 
 #### Acceptance Criteria
 
-- [ ] Given a rectangle element, borderRadius, appearance, boxEffects, and clipPath are enabled
-- [ ] Given a rectangle element, typography, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given a vector rectangle, borderRadius, appearance, boxEffects, and clipPath are enabled
+- [ ] Given a vector rectangle, typography, objectFit, vectorStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
 
 ---
 
-### Requirement: Ellipse Element Capabilities
+### Requirement: Vector Ellipse Capabilities
 
-Ellipse elements MUST enable: appearance, boxEffects, clipPath. borderRadius MUST be disabled (ellipses always render 50% radius). All other flags MUST be disabled.
+Vector elements with `geometryData.kind: 'ellipse'` MUST enable appearance, boxEffects, and clipPath. BorderRadius and all other flags MUST be disabled.
 
 #### Scenario: Ellipse capabilities
 
-- GIVEN an element of type `ellipse`
+- GIVEN `kind: 'vector'` with `geometryData.kind: 'ellipse'`
 - WHEN its capability profile is resolved
 - THEN appearance, boxEffects, clipPath are true; borderRadius and all others are false
 
 #### Acceptance Criteria
 
-- [ ] Given an ellipse element, appearance, boxEffects, and clipPath are enabled
-- [ ] Given an ellipse element, borderRadius is disabled
+- [ ] Given a vector ellipse, appearance, boxEffects, and clipPath are enabled
+- [ ] Given a vector ellipse, borderRadius is disabled
 
 ---
 
@@ -91,36 +91,37 @@ Image elements MUST enable: borderRadius, appearance, boxEffects, clipPath, obje
 
 ---
 
-### Requirement: SVG Element Capabilities
+### Requirement: Safe Foreign Vector Capabilities
 
-SVG elements MUST enable: borderRadius, appearance, boxEffects, clipPath, objectFit. All other flags MUST be disabled.
+A foreign element using `safeRenderMode: 'sanitized-vector'` MUST enable appearance, boxEffects, clipPath, and objectFit while keeping source content inert. Preview-only foreign elements enable only objectFit and diagnostic actions.
 
-#### Scenario: SVG capabilities
+#### Scenario: Sanitized-vector foreign capabilities
 
-- GIVEN an element of type `svg`
+- GIVEN a foreign element with `safeRenderMode: 'sanitized-vector'`
 - WHEN its capability profile is resolved
-- THEN borderRadius, appearance, boxEffects, clipPath, objectFit are true; all others are false
+- THEN appearance, boxEffects, clipPath, and objectFit are true; all others are false
 
 #### Acceptance Criteria
 
-- [ ] Given an SVG element, borderRadius, appearance, boxEffects, clipPath, and objectFit are enabled
+- [ ] Given sanitized-vector foreign content, appearance, boxEffects, clipPath, and objectFit are enabled without exposing executable source markup
+- [ ] Given preview-only foreign content, objectFit and diagnostics are enabled while vector editing is disabled
 
 ---
 
-### Requirement: Path Element Capabilities
+### Requirement: Vector Path Capabilities
 
-Path elements MUST enable: svgStrokeFill, pathEditing, instantPlace. All other flags MUST be disabled.
+Vector elements with `geometryData.kind: 'path'` MUST enable vectorStrokeFill, pathEditing, appearance, and instantPlace. Other subtype-only flags MUST be disabled.
 
 #### Scenario: Path capabilities
 
-- GIVEN an element of type `path`
+- GIVEN `kind: 'vector'` with `geometryData.kind: 'path'`
 - WHEN its capability profile is resolved
-- THEN svgStrokeFill, pathEditing, instantPlace are true; all others are false
+- THEN vectorStrokeFill, pathEditing, appearance, and instantPlace are true; all others are false
 
 #### Acceptance Criteria
 
-- [ ] Given a path element, svgStrokeFill, pathEditing, and instantPlace are enabled
-- [ ] Given a path element, borderRadius, typography, appearance, boxEffects, clipPath, objectFit, and squareConstrained are disabled
+- [ ] Given a vector path, vectorStrokeFill, pathEditing, appearance, and instantPlace are enabled
+- [ ] Given a vector path, borderRadius, typography, objectFit, and squareConstrained are disabled
 
 ---
 
@@ -156,19 +157,20 @@ Group elements MUST enable: appearance, clipPath. All other flags MUST be disabl
 
 ---
 
-### Requirement: Unknown Type Fallback
+### Requirement: Plugin and Unknown Fallback
 
-Unknown element types MUST resolve to a capability profile with all flags disabled.
+Canonical plugin elements without an authorized registered capability override and unknown untrusted discriminants MUST resolve to all flags disabled. Registration MAY enable UI capabilities but cannot bypass canonical validation.
 
 #### Scenario: Unknown type
 
-- GIVEN an element with a type not in the built-in list and no plugin override
+- GIVEN a plugin element without an authorized capability override
 - WHEN its capability profile is resolved
 - THEN all 10 flags are false
 
 #### Acceptance Criteria
 
-- [ ] Given an unknown element type, all capability flags are false
+- [ ] Given an unregistered plugin element, all capability flags are false
+- [ ] Given an unknown core discriminant, structural validation fails before capability resolution
 
 ---
 
@@ -185,7 +187,7 @@ Video elements MUST enable: borderRadius, appearance, boxEffects, clipPath, obje
 #### Acceptance Criteria
 
 - [ ] Given a video element, borderRadius, appearance, boxEffects, clipPath, and objectFit are enabled
-- [ ] Given a video element, typography, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given a video element, typography, vectorStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
 
 ---
 
@@ -202,7 +204,7 @@ Clock elements MUST enable: typography, appearance, boxEffects. All other flags 
 #### Acceptance Criteria
 
 - [ ] Given a clock element, typography, appearance, and boxEffects are enabled
-- [ ] Given a clock element, borderRadius, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given a clock element, borderRadius, clipPath, objectFit, vectorStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
 
 ---
 
@@ -219,7 +221,31 @@ Ticker elements MUST enable: typography, appearance, boxEffects. All other flags
 #### Acceptance Criteria
 
 - [ ] Given a ticker element, typography, appearance, and boxEffects are enabled
-- [ ] Given a ticker element, borderRadius, clipPath, objectFit, svgStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+- [ ] Given a ticker element, borderRadius, clipPath, objectFit, vectorStrokeFill, pathEditing, squareConstrained, and instantPlace are disabled
+
+---
+
+### Requirement: Audio and Component Instance Capabilities
+
+Audio elements MUST enable binding and timeline commands outside this visual capability profile while all ten visual flags remain disabled. Component-instance elements MUST derive the visible capabilities of schema-approved exposed properties; unexposed internal fields remain unavailable.
+
+#### Acceptance Criteria
+
+- [ ] Given an audio element, all ten visual capability flags are disabled while audio/binding/timeline panels remain available through their owning capability domains
+- [ ] Given a component instance, only controls backed by exposed-property schemas are enabled
+- [ ] Given an unexposed component-local property, no ordinary instance control targets it
+
+---
+
+### Requirement: Vector Boolean Capabilities
+
+Vector elements with `geometryData.kind: 'boolean'` MUST enable appearance and boolean operand/operation editing through their typed payload. Path point editing is disabled because operand geometry remains owned by the referenced vector elements.
+
+#### Acceptance Criteria
+
+- [ ] Given a vector boolean, appearance is enabled and typed operand/operation controls are available
+- [ ] Given a vector boolean, direct structured-path point editing is disabled
+- [ ] Given invalid or cyclic operands, the editing command is rejected by semantic validation
 
 ---
 

@@ -1,3 +1,4 @@
+import { resolvePositiveIntegerLimit } from '../_shared/import-limits';
 import type { OoxmlSkippedEntry } from './ooxml/zip';
 import type { PptxImportOptions, PptxImportWarning } from './types';
 
@@ -8,28 +9,41 @@ import type { PptxImportOptions, PptxImportWarning } from './types';
 const DEFAULT_MAX_INPUT_BYTES = 200 * 1024 * 1024; // 200 MiB
 const DEFAULT_MAX_PART_BYTES = 50 * 1024 * 1024; // 50 MiB
 const DEFAULT_MAX_ENTRIES = 4096;
+const DEFAULT_MAX_EXPANSION_RATIO = 100;
+const DEFAULT_MAX_DEPTH = 100;
 /**
  * Cumulative uncompressed-bytes budget for the entire ZIP. Stops a
  * payload that fans out into many small entries (each within the
- * per-entry cap) but whose total inflates to gigabytes from exhausting
- * memory before the cap fires.
+ * per-entry cap). 64 MiB is the retained-output ceiling so browser
+ * imports stay within the same resource envelope as other importers.
  */
-const DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024; // 1 GiB
+const DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES = 64 * 1024 * 1024; // 64 MiB
 
 interface ResolvedPptxCaps {
   readonly maxInputBytes: number;
   readonly maxEntries: number;
   readonly maxPartBytes: number;
   readonly maxTotalUncompressedBytes: number;
+  readonly maxExpansionRatio: number;
+  readonly maxDepth: number;
 }
 
 export function resolvePptxImportCaps(options?: PptxImportOptions): ResolvedPptxCaps {
   return {
-    maxInputBytes: options?.maxInputBytes ?? DEFAULT_MAX_INPUT_BYTES,
-    maxEntries: options?.maxEntries ?? DEFAULT_MAX_ENTRIES,
-    maxPartBytes: options?.maxPartBytes ?? DEFAULT_MAX_PART_BYTES,
-    maxTotalUncompressedBytes: options?.maxTotalUncompressedBytes ?? DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES,
+    maxInputBytes: resolvePositiveIntegerLimit(options?.maxInputBytes, DEFAULT_MAX_INPUT_BYTES),
+    maxEntries: resolvePositiveIntegerLimit(options?.maxEntries, DEFAULT_MAX_ENTRIES),
+    maxPartBytes: resolvePositiveIntegerLimit(options?.maxPartBytes, DEFAULT_MAX_PART_BYTES),
+    maxTotalUncompressedBytes: resolvePositiveIntegerLimit(
+      options?.maxTotalUncompressedBytes,
+      DEFAULT_MAX_TOTAL_UNCOMPRESSED_BYTES,
+    ),
+    maxExpansionRatio: positiveFiniteLimit(options?.maxExpansionRatio, DEFAULT_MAX_EXPANSION_RATIO),
+    maxDepth: resolvePositiveIntegerLimit(options?.maxDepth, DEFAULT_MAX_DEPTH),
   };
+}
+
+function positiveFiniteLimit(value: number | undefined, fallback: number): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 export function warningForSkippedOoxmlEntry(entry: OoxmlSkippedEntry, caps: ResolvedPptxCaps): PptxImportWarning {
@@ -50,6 +64,30 @@ export function warningForSkippedOoxmlEntry(entry: OoxmlSkippedEntry, caps: Reso
       return {
         code: 'size-cap',
         message: `Skipped entry "${entry.path}" — cumulative uncompressed size would exceed total cap ${String(caps.maxTotalUncompressedBytes)} bytes.`,
+        detail: entry.path,
+      };
+    case 'expansion-ratio-cap':
+      return {
+        code: 'size-cap',
+        message: `Skipped entry "${entry.path}" because its declared compression ratio exceeds ${String(caps.maxExpansionRatio)}:1.`,
+        detail: entry.path,
+      };
+    case 'path-cap':
+      return {
+        code: 'depth-cap',
+        message: `Skipped entry "${entry.path}" because its archive path exceeds depth ${String(caps.maxDepth)}.`,
+        detail: entry.path,
+      };
+    case 'unsafe-path':
+      return {
+        code: 'malformed-xml',
+        message: `Skipped unsafe or duplicate archive path "${entry.path}".`,
+        detail: entry.path,
+      };
+    case 'malformed-archive':
+      return {
+        code: 'malformed-xml',
+        message: 'PPTX package is not a readable ZIP archive — import rejected.',
         detail: entry.path,
       };
   }

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/experimental-ct-react';
 
 import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS } from '../fixture-selectors';
+import { getWidgetRotation } from './helpers';
 
 /* ------------------------------------------------------------------ */
 /*  Handle resize gestures — directional correctness                   */
@@ -14,7 +15,7 @@ import { FIXTURE_IDS } from '../fixture-selectors';
 test('dragging the NW handle resizes from the top-left corner', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -64,7 +65,7 @@ test('dragging the NW handle resizes from the top-left corner', async ({ mount, 
 test('dragging the SE handle resizes from the bottom-right corner', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -103,8 +104,8 @@ test('dragging the SE handle resizes from the bottom-right corner', async ({ mou
   expect(newBox.y).toBeCloseTo(initialBox.y, 0);
 
   // Size should not decrease when dragging SE outward.
-  expect(newBox.width).toBeGreaterThanOrEqual(initialBox.width);
-  expect(newBox.height).toBeGreaterThanOrEqual(initialBox.height);
+  expect(newBox.width).toBeGreaterThan(initialBox.width);
+  expect(newBox.height).toBeGreaterThan(initialBox.height);
 });
 
 /**
@@ -114,7 +115,7 @@ test('dragging the SE handle resizes from the bottom-right corner', async ({ mou
 test('dragging the N handle only changes top and height', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -153,8 +154,8 @@ test('dragging the N handle only changes top and height', async ({ mount, page }
   expect(newBox.width).toBeCloseTo(initialBox.width, 0);
 
   // Top should not move upward and height should decrease.
-  expect(newBox.y).toBeGreaterThanOrEqual(initialBox.y);
-  expect(newBox.height).toBeLessThanOrEqual(initialBox.height);
+  expect(newBox.y).toBeGreaterThan(initialBox.y);
+  expect(newBox.height).toBeLessThan(initialBox.height);
 });
 
 /**
@@ -164,7 +165,7 @@ test('dragging the N handle only changes top and height', async ({ mount, page }
 test('dragging the W handle only changes left and width', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -219,7 +220,7 @@ test('dragging the W handle only changes left and width', async ({ mount, page }
 test('dragging the rotation handle changes the widget rotation', async ({ mount, page }) => {
   await mount(<DemoApp />);
 
-  await page.locator(`[data-element-id="${FIXTURE_IDS.video}"]`).click({ force: true });
+  await page.locator(`[data-element-id="${FIXTURE_IDS.title}"]`).click({ force: true });
 
   const widget = page.getByTestId('demo-transform-widget');
 
@@ -227,9 +228,9 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
 
   // Element starts unrotated in the sample document; the shared transform
   // builder emits an empty string when rotation and 3D transforms are absent.
-  const initialTransform = await widget.evaluate((el) => el.style.transform);
+  const initialRotation = await getWidgetRotation(page);
 
-  expect(initialTransform).toBe('');
+  expect(initialRotation).toBeCloseTo(0, 4);
 
   const rotationHandle = page.getByTestId('transform-rotation-handle');
   const rotationBox = await rotationHandle.boundingBox();
@@ -247,16 +248,16 @@ test('dragging the rotation handle changes the widget rotation', async ({ mount,
   await page.mouse.move(startX + 80, startY + 30, { steps: 10 });
   await page.mouse.up();
 
-  let newTransform = await widget.evaluate((el) => el.style.transform);
+  let newRotation = await getWidgetRotation(page);
 
   // In CI the first drag can occasionally land on the 0deg axis.
-  if (newTransform === '' || newTransform === 'rotate(0deg)') {
+  if (Math.abs(newRotation) < 0.01) {
     await page.mouse.move(startX, startY);
     await page.mouse.down();
     await page.mouse.move(startX - 90, startY + 45, { steps: 12 });
     await page.mouse.up();
-    newTransform = await widget.evaluate((el) => el.style.transform);
+    newRotation = await getWidgetRotation(page);
   }
 
-  expect(newTransform).toMatch(/^rotate\([\d.-]+deg\)$/);
+  expect(Math.abs(newRotation)).toBeGreaterThan(0.01);
 });

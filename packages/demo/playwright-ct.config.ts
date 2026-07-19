@@ -10,6 +10,8 @@ export default defineConfig({
   reporter: [['list']],
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
+  // CI absorbs a single transient flake; locally, tests must pass on the first run so real flakes
+  // surface at the pre-push gate instead of being retried away (see cross-region-ct-audit.md).
   retries: process.env['CI'] ? 1 : 0,
   timeout: 30_000,
   ...(process.env['CI'] ? { workers: 2 } : {}),

@@ -9,10 +9,6 @@ interface ViewportSnapshot {
   readonly zoom: number;
 }
 
-async function openToolbarMenu(page: Page, menuLabel: string): Promise<void> {
-  await page.locator(`button[aria-label="${menuLabel}"]`).first().click();
-}
-
 async function moveMouseToPreviewCenter(page: Page): Promise<void> {
   const preview = page.getByLabel(/screen preview for/i);
   const box = await preview.boundingBox();
@@ -26,34 +22,11 @@ async function moveMouseToPreviewCenter(page: Page): Promise<void> {
 
 async function readViewportSnapshot(page: Page): Promise<ViewportSnapshot> {
   return page.evaluate(() => {
-    const panLayer = document.querySelector<HTMLElement>('[data-testid="screen-pan-layer"]');
-    const host = document.querySelector<HTMLElement>('[data-testid="screen-renderer-host"]');
+    const settings = window.__broadsetProjectEditorStore?.getState().canvasSettings;
 
-    if (panLayer === null || host === null) {
-      throw new Error('Expected screen preview pan and host layers');
-    }
+    if (settings === undefined) throw new Error('Expected v1 project editor store');
 
-    const panMatch = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(panLayer.style.transform);
-    const zoomMatch = /scale\(([-\d.]+)\)/.exec(host.style.transform);
-
-    if (panMatch === null || zoomMatch === null) {
-      throw new Error(`Unexpected viewport transform styles: ${panLayer.style.transform} / ${host.style.transform}`);
-    }
-
-    const [, panXText, panYText] = panMatch;
-    const [, zoomText] = zoomMatch;
-
-    if (panXText === undefined || panYText === undefined || zoomText === undefined) {
-      throw new Error(
-        `Missing viewport transform capture groups: ${panLayer.style.transform} / ${host.style.transform}`,
-      );
-    }
-
-    return {
-      panX: Number.parseFloat(panXText),
-      panY: Number.parseFloat(panYText),
-      zoom: Number.parseFloat(zoomText),
-    };
+    return { panX: settings.panX, panY: settings.panY, zoom: settings.zoom };
   });
 }
 
@@ -89,11 +62,7 @@ test('view menu Zoom to Fit resets canvas viewport and toolbar zoom label', asyn
     })
     .toEqual({ hasPanOffset: true, zoomPercent: 148 });
 
-  await openToolbarMenu(page, 'View');
-  await page
-    .getByRole('menuitem', { name: /Zoom to Fit/i })
-    .first()
-    .click();
+  await page.getByRole('button', { name: 'Zoom to fit' }).click();
 
   await expect(zoomLevel).toHaveText('100%');
   await expect

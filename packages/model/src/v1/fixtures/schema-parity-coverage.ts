@@ -1,0 +1,40 @@
+export const STRUCTURAL_COVERAGE_MATRIX = {
+  requiredFields: ['Task 2 rejects missing required metadata'],
+  literals: ['Task 2 rejects root literal mismatch'],
+  enums: ['Task 3 rejects document enum mismatch'],
+  numericBounds: ['Task 2 rejects numeric minimum'],
+  arrayBounds: ['Task 2 rejects array minimum'],
+  fixedTuples: ['Task 3 rejects fixed tuple overflow'],
+  closedObjects: ['Task 2 rejects unknown metadata fields', 'Task 3 rejects unknown surface fields'],
+  discriminatedVariants: ['Task 3 accepts a closed vector element', 'Task 5 accepts a closed sequence'],
+  identifiersAndRecordKeys: [
+    'Task 2 rejects control characters in IDs',
+    'Task 2 rejects control characters in ID-keyed records',
+  ],
+  absoluteHttpsUris: [
+    'Task 2 rejects non-HTTPS extension schema URLs',
+    'Task 2 delegates malformed HTTPS authority to semantics',
+  ],
+  exactTimestamps: ['Task 2 rejects impossible UTC timestamps'],
+  safeIntegers: ['Task 5 rejects fractional safe-integer timebase fields'],
+  conditionalPresence: [
+    'Task 5 requires a timebase for motion documents',
+    'Task 6 requires HDR10 light-level metadata',
+  ],
+  primitiveUniqueness: [
+    'Task 4 rejects duplicate primitive accepted-asset kinds',
+    'Task 6 rejects duplicate runtime requirement strings',
+  ],
+  conditionalCompatibility: ['Task 6 rejects an incompatible SDR transfer function'],
+  anyOfPresence: ['Task 6 requires an interop diagnostic pointer or entity'],
+  jsonPointers: ['Task 6 rejects malformed RFC 6901 interop pointers'],
+  digestPattern: ['Task 3 rejects malformed digest pattern'],
+  packagePathPattern: ['Task 3 rejects malformed package path pattern'],
+  mediaTypePattern: ['Task 3 rejects malformed media type pattern'],
+  axisTagPattern: ['Task 3 rejects malformed axis tag pattern'],
+  authoredMarkupPattern: ['Task 3 rejects authored markup pattern'],
+  semanticDelegation: [
+    'Task 6 leaves timestamp ordering to semantic validation',
+    'Task 6 leaves projected ID uniqueness to semantic validation',
+  ],
+} as const;

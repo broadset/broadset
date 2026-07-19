@@ -8,19 +8,19 @@ Defines the behavioral contracts for core editor store actions: document lifecyc
 
 ## Requirements
 
-### Requirement: Document Initialization
+### Requirement: Project Initialization
 
-The system MUST replace the entire document and reset undo history when a template is loaded. Document mode and feature config MUST be derived from the loaded document.
+The system MUST validate and replace the entire project and reset undo history when a template is loaded. Active document selection is runtime state; feature policy derives from the selected document's canonical `kind` and capabilities.
 
 #### Scenario: Load a new template
 
-- GIVEN a stored template document with `documentMode: 'print'`
+- GIVEN a stored canonical project whose selected document has `kind: 'print'`
 - WHEN the template is loaded into the editor
-- THEN the editor state contains the template's document, documentMode is `'print'`, feature config reflects print defaults, and undo history is empty
+- THEN editor state contains the complete project, derives print policy, and has empty undo history
 
 #### Acceptance Criteria
 
-- [ ] Given a template load, the editor state contains the template document with correct mode and empty undo history
+- [ ] Given a template load, editor state contains the complete validated project, derives policy from document kind, and has empty undo history
 
 ---
 
@@ -109,7 +109,7 @@ The system MUST support single selection, multi-selection, toggle selection, and
 
 ### Requirement: Ephemeral vs Committed Updates
 
-Ephemeral updates MUST NOT be tracked by undo/redo (used during drag at 60fps). Committed updates MUST be tracked. Both update element geometry (position, width, height, rotation, content, style).
+Ephemeral updates MUST NOT be tracked by undo/redo (used during drag at 60fps). Committed updates MUST be tracked. Geometry updates write canonical bounds and exact transform matrices; decomposed position, size, and rotation remain derived editor views.
 
 #### Scenario: Ephemeral update during drag
 
@@ -146,19 +146,19 @@ The system MUST batch position updates for multiple elements into a single undo 
 
 ---
 
-### Requirement: Style Update
+### Requirement: Appearance and Text-Property Update
 
-Style updates MUST be tracked by undo/redo.
+Updates to typed appearance layers or structured text properties MUST be tracked by undo/redo.
 
 #### Scenario: Update font size
 
-- GIVEN a text element with fontSize 14
-- WHEN fontSize is updated to 24
-- THEN the element's fontSize is 24 and the change is undoable
+- GIVEN a text run whose typed size is 14
+- WHEN the run size is updated to 24
+- THEN the run's typed size is 24 and the change is undoable
 
 #### Acceptance Criteria
 
-- [ ] Given a style update, the change is reflected and tracked in undo history
+- [ ] Given an appearance or structured-text property update, the change is reflected and tracked in undo history
 
 ---
 
@@ -187,17 +187,17 @@ The system MUST reorder elements in the document's element array by direction: `
 
 ### Requirement: Element Add and Remove
 
-Adding an element by type MUST use factory defaults for dimensions and content. Adding by full element data MUST use the provided data. Removing an element MUST also deselect it. Required elements (from EditorConfig) MUST NOT be deletable.
+Adding an element through an authoring tool MUST use factory defaults for bounds and the matching closed payload. Adding full canonical element data MUST use the provided data after validation. Removing an element MUST also deselect it. Required elements (from EditorConfig) MUST NOT be deletable.
 
 #### Scenario: Add by type uses factory defaults
 
-- GIVEN element type `'text'`
+- GIVEN the text authoring tool
 - WHEN the element is added
-- THEN a text element is created with default width, height, and content `'New Text'`
+- THEN a `kind: 'text'` element is created with default bounds and a `TextBody` containing one run with `"New Text"`
 
-#### Scenario: Add path element enters drawing mode
+#### Scenario: Add vector path enters drawing mode
 
-- GIVEN element type `'path'` added with empty content
+- GIVEN the path authoring tool creates `kind: 'vector'` with `geometryData.kind: 'path'` and an empty structured path
 - WHEN the element is added
 - THEN the element is selected and path drawing mode is activated
 
@@ -215,8 +215,8 @@ Adding an element by type MUST use factory defaults for dimensions and content. 
 
 #### Acceptance Criteria
 
-- [ ] Given add by type, factory defaults are used for dimensions and content
-- [ ] Given add path with empty content, path drawing mode activates automatically
+- [ ] Given an authoring tool, factory defaults produce a valid closed element payload and positive bounds
+- [ ] Given an empty vector structured path created by the path tool, path drawing mode activates automatically
 - [ ] Given element removal, the element is also deselected
 - [ ] Given a required element, deletion is blocked
 
@@ -224,7 +224,7 @@ Adding an element by type MUST use factory defaults for dimensions and content. 
 
 ### Requirement: Undo and Redo
 
-The system MUST track committed changes and support undo/redo. Temporal state MUST cover document, documentMode, featureConfig, and animations. Ephemeral updates and selection changes MUST be excluded from history. History size MUST be bounded by `maxUndoSteps` (default 50).
+The system MUST track committed whole-project changes and support undo/redo. History covers canonical resources, documents, components, pages, bindings, and sequences through snapshots or invertible atomic batches. Derived policy, ephemeral updates, navigation, and selection are excluded. History size remains bounded by `maxUndoSteps` (default 50).
 
 #### Scenario: Undo reverts last committed change
 
@@ -254,13 +254,13 @@ The system MUST track committed changes and support undo/redo. Temporal state MU
 
 ### Requirement: Element Grouping
 
-Grouping MUST assign a shared groupId to all currently selected elements. Ungrouping MUST clear groupId. Grouping MUST require at least 2 selected elements.
+Grouping MUST atomically create a canonical group with fresh ID, reparent compatible selected sibling roots through `parentId`, preserve resolved world transforms, and maintain preorder. Ungrouping reparents children to the group's parent, preserves order/world transforms, and removes the empty group. At least two compatible selected roots are required.
 
 #### Scenario: Group multi-selection
 
 - GIVEN elements A and B are selected
 - WHEN grouping is invoked
-- THEN both elements share the same non-null groupId
+- THEN a new group owns both elements through their `parentId`
 
 #### Scenario: Single selection cannot group
 
@@ -268,17 +268,17 @@ Grouping MUST assign a shared groupId to all currently selected elements. Ungrou
 - WHEN grouping is invoked
 - THEN nothing changes
 
-#### Scenario: Ungroup clears groupId
+#### Scenario: Ungroup removes structural group
 
 - GIVEN grouped elements A and B
 - WHEN ungrouping is invoked
-- THEN both elements have `groupId: null`
+- THEN both elements inherit the former group parent and the group is removed
 
 #### Acceptance Criteria
 
-- [ ] Given multi-selection, grouping assigns a shared groupId
+- [ ] Given compatible multi-selection, grouping creates one structural group and reparents selected roots
 - [ ] Given single selection, grouping is a no-op
-- [ ] Given ungrouping, groupId is cleared for all selected elements
+- [ ] Given ungrouping, child world geometry/order is preserved while the group is removed
 
 ---
 
@@ -382,26 +382,26 @@ When creating elements, position coordinates MUST be rounded to 0.01 precision (
 
 ### Requirement: Required Element Promotion on Parent Deletion
 
-When a parent element is deleted and one or more of its descendants are marked as required (present in `EditorConfig.requiredElements`), the required descendants MUST be promoted to root level (their `parentId` MUST be cleared to `undefined`). Non-required descendants MUST be deleted as normal. The promotion MUST preserve the required element's absolute position on the canvas.
+When a parent element is deleted and one or more of its descendants are marked as required (present in `EditorConfig.requiredElements`), the required descendants MUST be promoted to root level (their `parentId` MUST become `null`). Non-required descendants MUST be deleted as normal. The promotion MUST preserve the required element's resolved world transform.
 
 #### Scenario: Group deleted with required child
 
 - GIVEN a group element with child A (required) and child B (not required)
 - WHEN the group is deleted
-- THEN child A is promoted to root level with `parentId` cleared, and child B is deleted
+- THEN child A is promoted to root level with `parentId: null`, and child B is deleted
 
 #### Scenario: Grandparent deleted with required grandchild
 
 - GIVEN a nested hierarchy where grandchild C is required
 - WHEN its grandparent is deleted
-- THEN C is promoted to root level with `parentId` cleared
+- THEN C is promoted to root level with `parentId: null`
 
 #### Acceptance Criteria
 
-- [ ] Given a parent deletion with a required descendant, the required descendant's `parentId` is cleared
+- [ ] Given a parent deletion with a required descendant, the required descendant's `parentId` becomes `null`
 - [ ] Given a parent deletion with a required descendant, the required descendant is preserved in the document
 - [ ] Given a parent deletion with a non-required descendant, the non-required descendant is deleted
-- [ ] Given a promoted required element, its absolute canvas position is preserved
+- [ ] Given a promoted required element, its resolved world transform is preserved
 
 ---
 
@@ -430,25 +430,25 @@ Undo and redo operations apply to the full document regardless of the currently 
 
 ### Requirement: Named Snapshots
 
-The editor MUST support saving named snapshots of the current document state, independent of the undo/redo history. A snapshot stores a full deep clone of the `BroadsetDocument`, a user-provided name (non-empty string), and a creation timestamp (ISO 8601). The system MUST support at most 20 snapshots per document — creating a 21st MUST fail with an error. Users can restore, rename, and delete snapshots. Restoring a snapshot replaces the current document state with the snapshot's stored document and pushes the replacement onto the undo stack (so the restoration itself is undoable). Deleting a snapshot removes it permanently. Snapshots MUST persist across document serialization — they are stored alongside the document as a `snapshots` array. Snapshot names MUST be unique within a document.
+The editor MUST support saving named workspace snapshots of the complete canonical project state, independent of undo/redo history. A snapshot stores a deep clone of `BroadsetProjectV1`, a non-empty user-provided name, and an ISO 8601 creation timestamp. The system MUST support at most 20 snapshots per project; creating a 21st fails. Users can restore, rename, and delete snapshots. Restoring validates and replaces the whole project and pushes that replacement onto undo history. Snapshots are recovery artifacts stored outside canonical `project.json`; they MUST NOT add a `snapshots` field to the strict project or document vocabulary. Snapshot names MUST be unique within one workspace snapshot store.
 
 #### Scenario: Create snapshot
 
-- GIVEN a document with unsaved changes
+- GIVEN a project with unsaved changes
 - WHEN the user creates a snapshot named "Before animation"
-- THEN a snapshot entry is stored with the current document state, name, and timestamp
+- THEN a snapshot entry is stored with the current project state, name, and timestamp
 
 #### Scenario: Restore snapshot
 
-- GIVEN a snapshot "Before animation" and a subsequently modified document
+- GIVEN a snapshot "Before animation" and a subsequently modified project
 - WHEN the user restores the snapshot
-- THEN the document reverts to the snapshot's stored state and the restoration is pushed to the undo stack
+- THEN the project reverts to the snapshot's stored state and the restoration is pushed to the undo stack
 
 #### Scenario: Undo snapshot restoration
 
 - GIVEN a snapshot was just restored
 - WHEN the user triggers undo
-- THEN the document reverts to the state before restoration
+- THEN the project reverts to the state before restoration
 
 #### Scenario: Delete snapshot
 
@@ -470,55 +470,44 @@ The editor MUST support saving named snapshots of the current document state, in
 
 #### Acceptance Criteria
 
-- [ ] Given a create snapshot action, a snapshot with name, timestamp, and full document clone is stored
-- [ ] Given a restore snapshot action, the document is replaced and the restoration is undoable via undo
+- [ ] Given a create snapshot action, a snapshot with name, timestamp, and full canonical project clone is stored outside `project.json`
+- [ ] Given a restore snapshot action, the whole project is validated and replaced and restoration is undoable
 - [ ] Given a delete snapshot action, the snapshot is removed
 - [ ] Given 20 existing snapshots, creating a new one fails
 - [ ] Given a duplicate name, creation fails
-- [ ] Given serialization and deserialization, snapshots round-trip without loss
+- [ ] Given canonical project serialization, no snapshot field appears in `project.json`
 
 ---
 
-### Requirement: Per-Format Extensions Dirty Flag
+### Requirement: Derived Interop Cleanliness
 
-Every element-mutating store action MUST flip `extensions.<format>.dirty` to `true` for every Broadset format namespace (`psd`, `pdf`, `pptx`, `svg`) that is present on the mutated element. The per-format dirty flag is the sole signal format exporters consult to decide between re-emitting the element from the current Broadset state (dirty) and re-emitting the preserved original blob byte-for-byte (clean). This mechanism lives in `packages/editor/src/extensions-dirty.ts` as `markElementExtensionsDirty(element)` and is funneled through `updateDocumentElement`, `updateDocumentElements`, `commitGroupMove`, and `commitInlineText` so no element-mutating code path can bypass it.
+Editor actions MUST NOT persist format dirty booleans. Each preserved mapping stores an `InteropRecord.baselineSemanticHash`; cleanliness derives by hashing the current defined semantic projection. Relevant edits change derived status, and undo restoring baseline semantics restores clean status. Unknown generic extension envelopes pass through unchanged.
 
-Rules:
+#### Scenario: Relevant edit derives dirty
 
-- An action MUST flip every present format namespace in one pass — partial flips silently corrupt round-trip for whichever format slipped through.
-- Unknown namespaces (outside the four Broadset format ids) MUST pass through unchanged. Third-party extensions on an element are not owned by this middleware.
-- When every present flag is already `true`, the element reference MUST be returned unchanged so Zustand's referential equality checks can skip spurious re-renders.
-- Non-element-mutating actions (`reorderElement`, `toggleVisibility`, `selectElement`, snapshot/page/canvas actions) MUST NOT flip the flag.
-- Document-replacement actions (`setDocument`, `loadTemplate`, `restoreSnapshot`) MUST NOT flip the flag. A just-loaded document's flags represent the authoritative imported baseline; overwriting them with `true` would force an unnecessary re-emit on first export.
-- Undo/redo MUST restore the prior dirty state verbatim — the temporal history is authoritative for each snapshot.
+- GIVEN an interop record whose current projection matches its baseline
+- WHEN a committed edit changes a projected property
+- THEN the current semantic hash differs without adding a boolean field
 
-#### Scenario: Commit style update flips dirty
+#### Scenario: Undo restores clean
 
-- GIVEN an element with `extensions.psd.dirty: false`
-- WHEN `updateElementStyle` is called on that element
-- THEN the element's `extensions.psd.dirty` is `true`
+- GIVEN a relevant edit made the record derive dirty
+- WHEN undo restores baseline semantics
+- THEN the record derives clean again
 
-#### Scenario: Reorder preserves dirty
+#### Scenario: Runtime edit preserves clean
 
-- GIVEN an element with `extensions.psd.dirty: false`
-- WHEN `reorderElement` moves it forward in the element array
-- THEN the element's `extensions.psd.dirty` remains `false`
-
-#### Scenario: Unknown namespace preserved
-
-- GIVEN an element with `extensions.customTool.dirty: false`
-- WHEN any element-mutating action runs
-- THEN `extensions.customTool.dirty` remains `false` (only the four Broadset format ids flip)
+- GIVEN a clean interop record
+- WHEN selection or viewport changes
+- THEN projection and cleanliness are unchanged
 
 #### Acceptance Criteria
 
-- [ ] Given any of `updateElementEphemeral`, `commitElementUpdate`, `commitGroupMove`, `updateElementStyle`, `groupElements`, `ungroupElements`, `toggleLock`, or `commitInlineText`, every present `extensions.<format>.dirty` on the mutated element flips to `true`
-- [ ] Given `reorderElement` or `toggleVisibility`, no dirty flags flip
-- [ ] Given `setDocument`, `loadTemplate`, or `restoreSnapshot`, no dirty flags flip
-- [ ] Given `undo` after a mutating action, the prior dirty state is restored
-- [ ] Given a mutation of element A, dirty flags on element B are unchanged
-- [ ] Given unknown namespaces in `extensions`, they pass through unchanged
-- [ ] Given a non-plain-object value at a format slot, the middleware skips it defensively without crashing
+- [ ] Given a relevant canonical edit, cleanliness derives from current hash versus baseline
+- [ ] Given undo restoring baseline semantics, cleanliness derives clean
+- [ ] Given runtime-only changes, cleanliness is unchanged
+- [ ] Given project save, no permanent format dirty boolean is serialized
+- [ ] Given unknown generic extensions, editor mutations preserve payloads unchanged
 
 ---
 
@@ -542,7 +531,7 @@ Copy and paste operations MUST use the system clipboard (Clipboard API) when ava
 
 - GIVEN the system clipboard contains plain text "Hello World"
 - WHEN the user triggers paste
-- THEN a new text element with content "Hello World" is created at the viewport center
+- THEN a new text element whose `TextBody` contains "Hello World" is created at the viewport center
 
 #### Scenario: Clipboard API unavailable fallback
 
@@ -586,6 +575,6 @@ Copy and paste operations MUST use the system clipboard (Clipboard API) when ava
 
 - Page, canvas, guide, palette, font, media actions → see [store-ui-actions.md](store-ui-actions.md)
 - Path editing, path drawing, element placement modes → see [editing.md](editing.md)
-- Animation config mutations (timelines, state/modifier bindings) → see [animation-state.md](animation-state.md)
+- Sequence, property-track/keyframe, lifecycle, and state-machine mutations → see [animation-state.md](animation-state.md)
 - Change stream emission and remote change application → see [collaboration.md](collaboration.md)
 - Data store (BroadsetDataStore) for runtime data injection → see [data-store.md](data-store.md)

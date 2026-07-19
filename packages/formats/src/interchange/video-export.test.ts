@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { exportVideoBlob, isVideoExportSupported } from './index';
+import { exportVideoBlob, isVideoExportSupported } from '../video';
 
 /* ------------------------------------------------------------------ */
 /*  mediabunny mock                                                  */

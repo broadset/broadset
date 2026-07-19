@@ -1,4 +1,6 @@
-import { type UnzipFileInfo, type Unzipped, unzipSync, zipSync } from 'fflate';
+import { type Unzipped, unzipSync, zipSync } from 'fflate';
+
+import { type BoundedZipIssueCode, readBoundedZip } from '../../_shared/archive/zip-reader';
 
 /**
  * Thin wrapper around fflate for OOXML packages. Exposes a
@@ -24,9 +26,12 @@ export type OoxmlPackage = ReadonlyMap<string, Uint8Array>;
  * before the file's compressed bytes are inflated.
  */
 interface OoxmlReadCaps {
+  readonly maxInputBytes?: number;
   readonly maxEntries?: number;
   readonly maxPartBytes?: number;
   readonly maxTotalUncompressedBytes?: number;
+  readonly maxExpansionRatio?: number;
+  readonly maxDepth?: number;
 }
 
 interface OoxmlReadResult {
@@ -36,7 +41,14 @@ interface OoxmlReadResult {
 
 export interface OoxmlSkippedEntry {
   readonly path: string;
-  readonly reason: 'entry-cap' | 'size-cap' | 'total-size-cap';
+  readonly reason:
+    | 'entry-cap'
+    | 'size-cap'
+    | 'total-size-cap'
+    | 'expansion-ratio-cap'
+    | 'path-cap'
+    | 'unsafe-path'
+    | 'malformed-archive';
   /** Reported uncompressed size from the central directory header. */
   readonly originalSize: number;
 }
@@ -66,47 +78,51 @@ export function readOoxmlPackage(bytes: Uint8Array): OoxmlPackage {
  * cap fires.
  */
 export function readOoxmlPackageWithCaps(bytes: Uint8Array, caps: OoxmlReadCaps): OoxmlReadResult {
-  const skipped: OoxmlSkippedEntry[] = [];
-  let entryCount = 0;
-  let cumulativeBytes = 0;
+  const result = readBoundedZip({
+    bytes,
+    limits: {
+      maxInputBytes: caps.maxInputBytes ?? bytes.byteLength,
+      maxEntries: caps.maxEntries ?? Number.MAX_SAFE_INTEGER,
+      maxEntryBytes: caps.maxPartBytes ?? Number.MAX_SAFE_INTEGER,
+      maxTotalBytes: caps.maxTotalUncompressedBytes ?? Number.MAX_SAFE_INTEGER,
+      maxExpansionRatio: caps.maxExpansionRatio ?? Number.MAX_SAFE_INTEGER,
+      maxPathDepth: caps.maxDepth ?? Number.MAX_SAFE_INTEGER,
+    },
+  });
 
-  const filter = (file: UnzipFileInfo): boolean => {
-    entryCount += 1;
-
-    if (caps.maxEntries !== undefined && entryCount > caps.maxEntries) {
-      skipped.push({ path: file.name, reason: 'entry-cap', originalSize: file.originalSize });
-
-      return false;
-    }
-
-    if (caps.maxPartBytes !== undefined && file.originalSize > caps.maxPartBytes) {
-      skipped.push({ path: file.name, reason: 'size-cap', originalSize: file.originalSize });
-
-      return false;
-    }
-
-    if (
-      caps.maxTotalUncompressedBytes !== undefined &&
-      cumulativeBytes + file.originalSize > caps.maxTotalUncompressedBytes
-    ) {
-      skipped.push({ path: file.name, reason: 'total-size-cap', originalSize: file.originalSize });
-
-      return false;
-    }
-
-    cumulativeBytes += file.originalSize;
-
-    return true;
+  return {
+    pkg: result.entries,
+    skippedEntries: result.issues.map((entry) => ({
+      path: entry.path ?? '<archive>',
+      reason: ooxmlReason(entry.code),
+      originalSize: entry.declaredBytes ?? 0,
+    })),
   };
+}
 
-  const unzipped: Unzipped = unzipSync(bytes, { filter });
-  const parts = new Map<string, Uint8Array>();
-
-  for (const [path, content] of Object.entries(unzipped)) {
-    parts.set(path, content);
+function ooxmlReason(code: BoundedZipIssueCode): OoxmlSkippedEntry['reason'] {
+  switch (code) {
+    case 'entry-count-limit':
+      return 'entry-cap';
+    case 'entry-size-limit':
+    case 'input-size-limit':
+      return 'size-cap';
+    case 'total-size-limit':
+      return 'total-size-cap';
+    case 'expansion-ratio-limit':
+      return 'expansion-ratio-cap';
+    case 'path-depth-limit':
+      return 'path-cap';
+    case 'invalid-path':
+    case 'duplicate-path':
+      return 'unsafe-path';
+    case 'encrypted-entry':
+    case 'unsupported-compression':
+    case 'declared-size-mismatch':
+    case 'checksum-mismatch':
+    case 'malformed-archive':
+      return 'malformed-archive';
   }
-
-  return { pkg: parts, skippedEntries: skipped };
 }
 
 /**
@@ -124,9 +140,9 @@ export function readOoxmlPackageWithCaps(bytes: Uint8Array, caps: OoxmlReadCaps)
 export function writeOoxmlPackage(parts: ReadonlyMap<string, Uint8Array>): Uint8Array {
   const obj: Record<string, Uint8Array> = {};
 
-  for (const [path, content] of parts) {
+  parts.forEach((content: Uint8Array, path: string): void => {
     obj[path] = toSameRealmBytes(content);
-  }
+  });
 
   return zipSync(obj);
 }

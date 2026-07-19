@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/experimental-ct-react';
 
-import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS, FIXTURE_LAYER_LABELS } from '../fixture-selectors';
+import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 
 /* ------------------------------------------------------------------ */
 /*  Backspace deletes the selected element across canvas + widget +    */
@@ -20,13 +20,13 @@ test('Backspace removes the selected element across canvas, widget, properties, 
   mount,
   page,
 }) => {
-  await mount(<DemoApp />);
+  await mount(<DemoAppFresh />);
 
   // Select the Goal Icon via the layers panel — avoids any transform-widget
   // intercept that the canvas-click path could otherwise hit.
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 
-  const sidebar = page.getByTestId('demo-properties-sidebar');
+  const sidebar = page;
   const layerRow = sidebar.locator('[role="button"]', { hasText: FIXTURE_LAYER_LABELS.accentSvg });
 
   await layerRow.click();
@@ -41,7 +41,7 @@ test('Backspace removes the selected element across canvas, widget, properties, 
   // Confirm the Properties tab button starts enabled (the auto-selection on
   // mount populates the Properties view), so we can later assert that
   // deletion disables it.
-  const propertiesTab = page.locator('button[aria-label="Properties"]').first();
+  const propertiesTab = page.getByRole('tab', { name: 'Properties' });
 
   await expect(propertiesTab).toBeEnabled();
 
@@ -57,4 +57,25 @@ test('Backspace removes the selected element across canvas, widget, properties, 
   //    `isDisabled={selectedElement === null}` rule means the cleared
   //    selection is mirrored in the toolbar tab state.
   await expect(propertiesTab).toBeDisabled();
+  await expect(page.getByRole('textbox', { name: 'Element name' })).toHaveCount(0);
+});
+
+test('Delete preserves a required native project element', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+
+  const requiredElement = page.locator(`[data-element-id="${FIXTURE_IDS.background}"]`).first();
+
+  await requiredElement.dispatchEvent('pointerdown', { button: 0, buttons: 1 });
+  await page.keyboard.press('Delete');
+
+  await expect(requiredElement).toBeAttached();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__broadsetProjectEditorStore
+          ?.getState()
+          .project.documents[0]?.elements.some(({ id }) => id === 'el-top-gradient'),
+      ),
+    )
+    .toBe(true);
 });

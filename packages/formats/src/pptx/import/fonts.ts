@@ -1,23 +1,22 @@
-import { type FontAsset, fontAsset } from '@broadset/model';
-
 import { findChild, findChildren, findDescendant, getAttr, parseOoxml, rootElement } from '../ooxml/ast';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import { parseRelationshipsXml } from '../ooxml/relationships';
 import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
+import { createPptxEmbeddedFontAsset, type PptxEmbeddedFontAsset } from '../project-model';
 import { resolveRelTarget } from './package';
 
 /**
  * Recover embedded fonts from a `.pptx` package back into Broadset
- * `FontAsset` entries. Walks `ppt/_rels/presentation.xml.rels` for
+ * `PptxEmbeddedFontAsset` entries. Walks `ppt/_rels/presentation.xml.rels` for
  * `font`-typed relationships, cross-references the `<p:embeddedFontLst>`
  * inside `ppt/presentation.xml` to map relationship IDs to family
  * names, reads the `ppt/fonts/font{N}.fntdata` bytes, and emits one
- * FontAsset per embedded font with the bytes inlined as a
+ * PptxEmbeddedFontAsset per embedded font with the bytes inlined as a
  * `data:font/ttf;base64,…` `embedded` source so the host project can
  * carry it forward.
  *
  * Closes the spec gap "importer-side recovery of embedded fonts back
- * into FontAssets" — pairs with the export-side `embeddedFontLst`
+ * into PptxEmbeddedFontAssets" — pairs with the export-side `embeddedFontLst`
  * emission so a Broadset-exported `.pptx` round-trips its fonts on
  * re-import.
  */
@@ -30,7 +29,7 @@ interface EmbeddedFontRef {
 const TTF_MIME = 'font/ttf';
 const OTF_MIME = 'font/otf';
 
-export function extractEmbeddedFonts(pkg: OoxmlPackage): readonly FontAsset[] {
+export function extractEmbeddedFonts(pkg: OoxmlPackage): readonly PptxEmbeddedFontAsset[] {
   const presRelsXml = readTextPart(pkg, 'ppt/_rels/presentation.xml.rels');
   const presXml = readTextPart(pkg, 'ppt/presentation.xml');
 
@@ -50,7 +49,7 @@ export function extractEmbeddedFonts(pkg: OoxmlPackage): readonly FontAsset[] {
 
   if (familyByRelId.length === 0) return [];
 
-  const assets: FontAsset[] = [];
+  const assets: PptxEmbeddedFontAsset[] = [];
   let counter = 0;
 
   for (const ref of familyByRelId) {
@@ -70,7 +69,7 @@ export function extractEmbeddedFonts(pkg: OoxmlPackage): readonly FontAsset[] {
     const dataUri = `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 
     assets.push(
-      fontAsset({
+      createPptxEmbeddedFontAsset({
         id: `pptx-font-${String(counter)}`,
         name: ref.familyName,
         mimeType,
@@ -111,7 +110,7 @@ function readEmbeddedFontList(presXml: string): readonly EmbeddedFontRef[] {
 
   for (const entry of findChildren(list, 'p:embeddedFont')) {
     const fontMeta = findChild(entry, 'p:font');
-    const familyName = fontMeta !== null ? getAttr(fontMeta, 'typeface') ?? '' : '';
+    const familyName = fontMeta !== null ? (getAttr(fontMeta, 'typeface') ?? '') : '';
 
     if (familyName.length === 0) continue;
 
@@ -143,7 +142,7 @@ function detectFontFormat(bytes: Uint8Array): 'ttf' | 'otf' {
   if (header.every((b, i) => b === TTF_SIGNATURE[i])) return 'ttf';
 
   // Unknown / "true"-tagged TrueType / obfuscated → assume TTF; the
-  // FontAsset format is informational, not load-gated.
+  // PptxEmbeddedFontAsset format is informational, not load-gated.
   return 'ttf';
 }
 

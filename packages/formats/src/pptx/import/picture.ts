@@ -1,6 +1,5 @@
-import { type BroadsetElement } from '@broadset/model';
-
 import { findDescendant, getAttr, type XmlElement } from '../ooxml/ast';
+import type { PptxSourceElement } from '../project-model';
 
 export interface PictureSourceRef {
   readonly path: string;
@@ -26,12 +25,13 @@ interface BuildPictureElementOptions {
   readonly name: string;
   readonly id: string;
   readonly mediaByRelId: ReadonlyMap<string, PictureSourceRef>;
-  readonly createFallback: () => BroadsetElement;
-  readonly createImageBase: () => BroadsetElement;
+  readonly dataUriByMediaPath: Map<string, string>;
+  readonly createFallback: () => PptxSourceElement;
+  readonly createImageBase: () => PptxSourceElement;
   readonly pushWarning: (warning: PictureImportWarning) => void;
 }
 
-export function buildPictureElement(options: BuildPictureElementOptions): BroadsetElement {
+export function buildPictureElement(options: BuildPictureElementOptions): PptxSourceElement {
   const blip = findDescendant(options.shape, 'a:blip');
 
   if (blip === null) {
@@ -58,7 +58,13 @@ export function buildPictureElement(options: BuildPictureElementOptions): Broads
   }
 
   const base = options.createImageBase();
-  const dataUri = `data:${media.mime};base64,${uint8ToBase64(media.bytes)}`;
+  let dataUri = options.dataUriByMediaPath.get(media.path);
+
+  if (dataUri === undefined) {
+    dataUri = `data:${media.mime};base64,${uint8ToBase64(media.bytes)}`;
+    options.dataUriByMediaPath.set(media.path, dataUri);
+  }
+
   const srcRect = parseSrcRect(options.shape);
 
   if (srcRect === null) return { ...base, content: dataUri };
@@ -112,8 +118,8 @@ function uint8ToBase64(bytes: Uint8Array): string {
 
   let binary = '';
 
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
+  for (let index = 0; index < bytes.byteLength; index += 1) {
+    binary += String.fromCharCode(bytes[index] ?? 0);
   }
 
   return btoa(binary);

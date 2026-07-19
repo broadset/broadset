@@ -3,15 +3,15 @@ import { escapeXmlAttribute, escapeXmlText } from '../ooxml/xml';
 import { BROADSET_ELEMENT_EXT_URI, type ElementMetaExtension } from '../types';
 
 /**
- * Per-shape `<p:extLst>` element tagging.
+ * Per-shape `<a:extLst>` element tagging.
  *
- * Every Broadset element emits a `<p:ext uri="{broadset-element-ext}">…</p:ext>`
+ * Every Broadset element emits an `<a:ext uri="{broadset-element-ext}">…</a:ext>`
  * under its non-visual properties. The extension carries structured
  * per-element semantics that don't fit in the shape name: dataField,
  * visibleWhen, repeater, animations, originalKind, and the dirty flag.
  *
  * OOXML conforming readers (PowerPoint, Keynote, LibreOffice) MUST
- * preserve unknown `<p:ext>` elements verbatim across save — that's the
+ * preserve unknown `<a:ext>` elements verbatim across save — that's the
  * mechanism that makes this pattern durable across round-trips.
  */
 
@@ -56,13 +56,13 @@ export function buildElementExt(meta: ElementMetaExtension): string {
       ? `<bset:preservedBlob>${escapeXmlText(meta.preservedBlob)}</bset:preservedBlob>`
       : '';
 
-  return `<p:ext uri="${BROADSET_ELEMENT_EXT_URI}"><bset:elementMeta xmlns:bset="${BROADSET_META_NS}" ${attrs.join(' ')}>${animationsXml}${preservedXml}</bset:elementMeta></p:ext>`;
+  return `<a:ext uri="${BROADSET_ELEMENT_EXT_URI}"><bset:elementMeta xmlns:bset="${BROADSET_META_NS}" ${attrs.join(' ')}>${animationsXml}${preservedXml}</bset:elementMeta></a:ext>`;
 }
 
 const BROADSET_META_NS_URI = BROADSET_META_NS;
 
 /**
- * Parse an `<p:ext>` XML body back into an {@link ElementMetaExtension}.
+ * Parse an `<a:ext>` XML body back into an {@link ElementMetaExtension}.
  * Returns `null` for strings that don't contain a broadset-element-ext
  * entry — callers fall back to fingerprint matching.
  *
@@ -86,7 +86,7 @@ export function parseElementExt(input: string): ElementMetaExtension | null {
  * the fragment doesn't carry a broadset metadata extension.
  */
 function locateElementMetaNode(input: string): XmlElement | null {
-  const wrapped = `<root xmlns:p="${PRESENTATIONML_NS}">${input}</root>`;
+  const wrapped = `<root xmlns:a="${DRAWINGML_NS}" xmlns:p="${PRESENTATIONML_NS}">${input}</root>`;
   const root = rootElement(parseOoxml(wrapped));
 
   if (root === null) return null;
@@ -156,18 +156,19 @@ function readOptionalStringAttrs(meta: XmlElement): {
 }
 
 const PRESENTATIONML_NS = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+const DRAWINGML_NS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 
 /**
- * Recursively find the first `<p:ext>` (presentationML namespace)
+ * Recursively find the first `<a:ext>` (DrawingML namespace)
  * whose `uri` attribute matches the broadset-element-ext URI. The
- * metadata is always nested under `<p:ext uri="…">` per OOXML
+ * metadata is always nested under `<a:ext uri="…">` per OOXML
  * extension conventions.
  */
 function findFirstBroadsetExt(node: XmlElement): XmlElement | null {
   for (const child of node.children) {
     if (child.kind !== 'element') continue;
 
-    if (child.local === 'ext' && child.ns === PRESENTATIONML_NS) {
+    if (child.local === 'ext' && child.ns === DRAWINGML_NS) {
       const uri = getAttr(child, 'uri');
 
       if (uri === BROADSET_ELEMENT_EXT_URI) return child;

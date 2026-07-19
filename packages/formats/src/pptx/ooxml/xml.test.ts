@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { escapeXmlAttribute, escapeXmlText, parseXml, XML_DECLARATION } from './xml';
 
-/**
- * @description The XML parser must accept OOXML markup and return a
- * structured representation whose attribute values are preserved as
- * strings. The parser is the foundation of every import path.
- */
 describe('parseXml', () => {
   it('returns null for empty / whitespace input', () => {
     expect(parseXml('')).toBeNull();
@@ -14,46 +9,39 @@ describe('parseXml', () => {
   });
 
   it('parses a namespaced element with an attribute', () => {
-    const result = parseXml('<p:sp><p:nvSpPr id="1"/></p:sp>');
-
-    expect(result).toBeDefined();
+    expect(parseXml('<p:sp><p:nvSpPr id="1"/></p:sp>')).toBeDefined();
   });
 
   it('preserves z-order-significant child order via preserveOrder', () => {
-    const result = parseXml('<root><a/><b/><a/></root>');
-
-    expect(Array.isArray(result)).toBe(true);
+    expect(Array.isArray(parseXml('<root><a/><b/><a/></root>'))).toBe(true);
   });
 
-  it('does NOT expand DTD-declared entities (XXE / billion-laughs hardening)', () => {
-    // fast-xml-parser ignores DOCTYPE declarations entirely — the
-    // imported content should surface the literal entity reference
-    // rather than expanding it billions of times.
-    const bomb = `<?xml version="1.0"?>
-<!DOCTYPE lolz [
-  <!ENTITY lol "lol">
-  <!ENTITY lol2 "&lol;&lol;&lol;">
-  <!ENTITY lol3 "&lol2;&lol2;&lol2;">
-]>
-<root>&lol3;</root>`;
+  it('rejects DTD-declared entities before parser entry', () => {
+    const declaration = '<!DOCTYPE root [<!ENTITY payload "expanded">]><root>&payload;</root>';
 
-    const result = parseXml(bomb);
+    expect(() => parseXml(declaration)).toThrow(/forbidden/u);
+  });
 
-    expect(JSON.stringify(result).length).toBeLessThan(2_000);
+  it('rejects excessive XML depth before parser entry', () => {
+    const depth = 101;
+    const nested = `${'<n>'.repeat(depth)}${'</n>'.repeat(depth)}`;
+
+    expect(() => parseXml(nested)).toThrow(/depth-limit/u);
+  });
+
+  it('allows declaration-shaped text inside comments, CDATA, and processing instructions', () => {
+    expect(() => parseXml('<root><!-- <!DOCTYPE harmless> --></root>')).not.toThrow();
+    expect(() => parseXml('<root><![CDATA[<!DOCTYPE harmless>]]></root>')).not.toThrow();
+    expect(() => parseXml('<?probe value="<!DOCTYPE harmless>"?><root/>')).not.toThrow();
   });
 });
 
-/**
- * @description XML-text / attribute escape helpers guard against user
- * content containing `<`, `>`, `&`, `"`, `'` — all of which can produce
- * malformed output or inject element boundaries if unescaped.
- */
 describe('escape helpers', () => {
   it('escapes `<`, `>`, and `&` in text', () => {
     expect(escapeXmlText('a & b < c > d')).toBe('a &amp; b &lt; c &gt; d');
   });
 
-  it('escapes `"` and `\'` in addition to text escapes for attributes', () => {
+  it('escapes quotes in addition to text escapes for attributes', () => {
     expect(escapeXmlAttribute('a"b\'c')).toContain('&quot;');
     expect(escapeXmlAttribute('a"b\'c')).toContain('&apos;');
   });

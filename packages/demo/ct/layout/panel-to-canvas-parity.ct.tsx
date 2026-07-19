@@ -5,11 +5,11 @@ import { DemoApp } from '../../src/DemoApp';
 import { FIXTURE_IDS } from '../fixture-selectors';
 
 async function openLayers(page: Page): Promise<void> {
-  await page.locator('button[aria-label="Layers"]').first().click();
+  await page.getByRole('tab', { name: 'Layers' }).click();
 }
 
 async function openProperties(page: Page): Promise<void> {
-  await page.locator('button[aria-label="Properties"]').first().click();
+  await page.getByRole('tab', { name: 'Properties' }).click();
 }
 
 async function selectLayer(page: Page, label: string): Promise<void> {
@@ -81,7 +81,7 @@ test('editing font size in the typography panel updates the canvas text element 
   await expect
     .poll(async () =>
       textNode.evaluate((el) => {
-        const inner = el.querySelector<HTMLElement>('[data-element-content]') ?? (el as HTMLElement);
+        const inner = el.querySelector<HTMLElement>('[data-element-content] span') ?? el;
 
         return parseFloat(getComputedStyle(inner).fontSize);
       }),
@@ -115,7 +115,7 @@ test('editing linked padding in the spacing panel updates the canvas element pad
 
   const readPadding = async (side: 'Top' | 'Right'): Promise<string> =>
     textNode.evaluate((el, key) => {
-      const inner = el.querySelector<HTMLElement>('[data-element-content]') ?? (el as HTMLElement);
+      const inner = el.querySelector<HTMLElement>('[data-element-content]') ?? el;
 
       return (getComputedStyle(inner) as unknown as Record<string, string>)[key] ?? '';
     }, `padding${side}`);

@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Defines the animation and interpolation engine for broadset. The playback domain computes interpolated property values at arbitrary points in time, applies easing curves, manages timeline playback, and drives DOM style updates for element state transitions. It operates on the `animations` array from the model domain and is consumed by the renderer and editor. It does NOT own the document model, render DOM structure, or manage editor state. See [conventions](../../README.md).
+Defines the animation and interpolation engine for broadset. Playback resolves canonical sequences, stable tracks/keyframes, lifecycle and state-machine transitions at exact integer ticks, then exposes typed property results to renderer/editor adapters. It does NOT own project validation, DOM structure, or editor state. See [conventions](../../README.md).
 
 ---
 
 ## Sub-Specs
 
-| Sub-Spec                             | Scope                                                           |
-| ------------------------------------ | --------------------------------------------------------------- |
-| [interpolation.md](interpolation.md) | Easing, value interpolation, color lerp, path morphing          |
-| [timeline.md](timeline.md)           | Timeline computation, action state, duration, child composition |
-| [playback.md](playback.md)           | Playback controller, playback handle, style writer, transitions |
+| Sub-Spec                             | Scope                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------- |
+| [interpolation.md](interpolation.md) | Easing, value interpolation, color lerp, path morphing                          |
+| [timeline.md](timeline.md)           | Exact-tick sequence, track, child-clip, lifecycle, and state-machine evaluation |
+| [playback.md](playback.md)           | Sequence transport, playback handle, DOM writer, and transition scheduling      |
 
 ---
 

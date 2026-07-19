@@ -6,7 +6,7 @@ import { DemoAppFresh } from '../helpers/demo-app-fresh.helper';
 
 async function getLatestPathVertexCount(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const hosts = document.querySelectorAll<HTMLElement>('[data-testid="screen-renderer-host"] [data-element-id]');
+    const hosts = document.querySelectorAll<HTMLElement>('[data-testid="v1-page-preview"] [data-element-id]');
 
     for (let index = hosts.length - 1; index >= 0; index -= 1) {
       const host = hosts[index];
@@ -26,13 +26,7 @@ async function getLatestPathVertexCount(page: Page): Promise<number> {
 
 async function isPathDrawingActive(page: Page): Promise<boolean> {
   return page.evaluate(() => {
-    const store = (
-      window as unknown as {
-        __broadsetEditorStore?: {
-          getState: () => { readonly pathDrawingElementId: string | null };
-        };
-      }
-    ).__broadsetEditorStore;
+    const store = window.__broadsetProjectEditorStore;
 
     return (store?.getState().pathDrawingElementId ?? null) !== null;
   });

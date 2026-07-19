@@ -92,6 +92,16 @@ function createMemoryStorage(): Storage {
   };
 }
 
+class TestResizeObserver implements ResizeObserver {
+  public constructor(_callback: ResizeObserverCallback) {}
+
+  public disconnect(): void {}
+
+  public observe(_target: Element, _options?: ResizeObserverOptions): void {}
+
+  public unobserve(_target: Element): void {}
+}
+
 if (typeof window !== 'undefined') {
   const localStorage = createMemoryStorage();
 
@@ -107,6 +117,37 @@ if (typeof window !== 'undefined') {
     value: localStorage,
     writable: true,
   });
+
+  const matchMediaValue: unknown = Reflect.get(window, 'matchMedia');
+
+  if (typeof matchMediaValue !== 'function') {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string): MediaQueryList => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener(): void {},
+        addListener(): void {},
+        dispatchEvent(): boolean {
+          return true;
+        },
+        removeEventListener(): void {},
+        removeListener(): void {},
+      }),
+      writable: true,
+    });
+  }
+
+  const resizeObserverValue: unknown = Reflect.get(globalThis, 'ResizeObserver');
+
+  if (typeof resizeObserverValue !== 'function') {
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      configurable: true,
+      value: TestResizeObserver,
+      writable: true,
+    });
+  }
 }
 
 // jsdom does not implement SVG geometry APIs (getTotalLength / getPointAtLength)

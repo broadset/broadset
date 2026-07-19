@@ -1,8 +1,8 @@
-# UI — Timeline Specification
+# UI — Timeline Editor Specification
 
 ## Purpose
 
-Defines the behavioral requirements for the timeline editor, timeline bottom panel, and timeline editing context — the controls for creating and editing animation keyframes and timelines.
+Defines the user-facing timeline editor for document/component sequences, stable property tracks, typed keyframes, lifecycle bindings, and state-machine transition actions. The UI may display seconds, frames, or timecode, but every mutation commits exact integer ticks.
 
 ---
 
@@ -10,414 +10,405 @@ Defines the behavioral requirements for the timeline editor, timeline bottom pan
 
 ### Requirement: Timeline Editor Keyframe Management
 
-The system MUST render an empty state when no keyframes exist. A `+` button MUST add a keyframe and select it. Clicking a keyframe marker MUST show the keyframe hint and set `aria-pressed`. Only one keyframe MUST be selected at a time. Re-clicking the same marker MUST keep it selected.
+The editor MUST render an empty state when the selected canonical track has no keyframes. The add button creates a stable typed keyframe on a selected track and selects it. Clicking a marker shows its hint and sets `aria-pressed`; only one keyframe is selected at a time.
 
-**Timeline Editor Visual Structure:**
+**Visual structure:**
 
-The timeline editor MUST be composed of these visual zones:
+| Zone            | Position      | Content                                                                                                                                                        |
+| --------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Editor controls | Top-left      | Add-keyframe button; playback controls remain in the host Animation toolbar                                                                                    |
+| Timeline ruler  | Top, spanning | Shared exact-tick rail with seconds/frame/timecode labels derived through the document timebase                                                                |
+| Track lanes     | Center        | One lane per stable property track; markers use `keyframe.tick`; empty-area gestures move the playhead                                                         |
+| Playhead        | Vertical line | Accent line showing the current exact tick and a derived presentation label; draggable for scrubbing                                                           |
+| Keyframe list   | Bottom        | Stable ID/name, derived time label, target property, typed value kind, and interpolation; click selects and double-click renames the user-facing keyframe name |
 
-| Zone            | Position      | Content                                                                                                                                                   |
-| --------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Editor controls | Top-left      | Add-keyframe button. Play/Pause and Stop buttons MUST NOT render inside the editor — playback is owned by the host shell's animation toolbar              |
-| Timeline ruler  | Top, spanning | Horizontal ruler with time markers (step interval configurable, default every 500ms). Grid lines at snap intervals (default 100ms)                        |
-| Keyframe track  | Center        | Horizontal track where keyframe markers are positioned at their time offsets. Clicking an empty area of the track MUST position the playhead at that time |
-| Playhead        | Vertical line | Red/accent-colored vertical line indicating current playback time. Draggable for timeline scrubbing. Synced with playback engine time                     |
-| Keyframe list   | Bottom        | Table/list of keyframes showing: Name, Offset (ms), Action type, Property count. Click to select, double-click to rename                                  |
+**Track lanes and ordering:**
 
-**Timeline Scope Lanes:**
+Document-owned or component-owned sequences render one lane per stable track. Lanes sort deterministically by target entity identity and RFC 6901 property pointer, with tracks targeting the current selection first. Lane labels never seek. Same-tick markers remain bounded within their lane and fan horizontally so dense stacks remain selectable.
 
-The keyframe track MUST render separate named lanes for owner keyframes and targeted child-element keyframes. The owner lane MUST remain first regardless of keyframe time ordering, and target lanes MUST use deterministic target-identity ordering so lane positions do not jump when keyframes are added, moved, renamed, or resolved from fallback IDs to display names. The lane label column MUST be visually distinct from the time rail and MUST NOT respond to scrub or seek gestures. The time ruler, playhead, scrub gestures, and keyframe dragging MUST remain aligned to one shared time rail across all lanes.
+**Duration and time conversion:**
 
-**Timeline Duration:**
+Visible length MUST equal the selected sequence's explicit `durationTicks`. A newly created sequence MAY use a friendly default of three display seconds, but the authoring command converts that duration through the timebase and commits explicit `durationTicks` before the editor opens. The UI MUST NOT derive duration from keyframe positions.
 
-The visible timeline length MUST use `timeline.durationMs` when an explicit duration is present. When no explicit duration is present, it MUST be calculated as `max(keyframe offsets) + 1000ms`, with a minimum of `3000ms`. This ensures the visual ruler, playhead position, and host playback/seek clamping all share one duration contract.
+Ruler labels MAY display seconds with one decimal, frame number, or document timecode. Pointer positions first map to a ratio of `durationTicks`, then to an integer tick using the selected snap policy. A default “100 ms” UI grid is a presentation preference converted once to a positive integer tick interval; the UI displays the actual resolved interval when the timebase cannot represent the preference exactly. Frame snapping maps to exact frame-start ticks. No millisecond offset is persisted.
 
-**Ruler Time Format:**
+**Keyframe markers:**
 
-Ruler time labels MUST use seconds with one decimal place (e.g., `0.0s`, `0.5s`, `1.0s`, `2.5s`). This provides clear, scannable time references without millisecond clutter.
+Markers are circular or diamond indicators positioned by `keyframe.tick`. Selected markers have a distinct highlight. Color communicates typed track/value category rather than a state-changing action:
 
-**Keyframe Markers:**
+| Track/value category                    | Color  | Semantic                         |
+| --------------------------------------- | ------ | -------------------------------- |
+| Numeric/tuple transform or scalar       | Accent | Continuous property contribution |
+| Color                                   | Focus  | Color-space-aware contribution   |
+| Boolean/string/asset or hold/step value | Danger | Discrete contribution            |
 
-Keyframe markers MUST appear as small circular or diamond-shaped indicators positioned along the timeline track at their offset. Selected markers MUST have a distinct highlight (e.g., accent color fill). Markers MUST be draggable to reposition.
+**Interpolation:**
 
-Markers MUST be color-coded by their action type for quick visual identification:
+The keyframe detail area edits the closed interpolation variant for the segment beginning at that keyframe. It MUST offer only variants compatible with the track value and target. Friendly presets map to typed cubic-Bézier or spring records before commit.
 
-| Action type      | Color  | Semantic                   |
-| ---------------- | ------ | -------------------------- |
-| `setState`       | Accent | Primary state change       |
-| `addModifier`    | Focus  | Adding a visual modifier   |
-| `removeModifier` | Danger | Removing a visual modifier |
+**Scrubbing and add at playhead:**
 
-Same-time markers MAY stack within a lane, but their stack offsets MUST remain bounded inside that lane so markers do not visually cross into another scope lane. Dense same-time stacks MUST fan horizontally before markers collapse onto identical positions so each keyframe remains visible and selectable.
+Dragging the playhead or empty rail calls `onSeekTick(tick)` on pointer-down and pointer-move. Dragging a marker also previews its candidate tick. The add control calls `onAddKeyframe(sequenceId, trackId, tick)` and seeds a type-compatible value from the resolved target snapshot at that tick. If no track is selected, the UI asks the user to select/create a property track rather than creating a generic property bag.
 
-**Keyframe Easing:**
+#### Scenario: Empty track
 
-Each keyframe MUST have a configurable easing function that controls interpolation from this keyframe to the next. The default easing MUST be `ease`. Common presets MUST be available via a dropdown (e.g., `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`). The easing dropdown MUST appear in the keyframe detail area when a keyframe is selected.
-
-**Snap Behavior:**
-
-When dragging keyframes, positions MUST snap to the grid interval. The default snap interval is 100ms.
-
-The shared time rail MUST show visible snap grid lines. For long explicit timelines, the renderer MAY increase the visible grid interval while preserving drag snapping behavior so the UI does not create thousands of sub-pixel grid nodes.
-
-**Playhead Scrubbing:**
-
-Dragging the playhead or an empty area of the track MUST call `onSeekTimeline` on pointer-down and on every pointer-move so the canvas previews the scrub position in real-time. Dragging a keyframe marker MUST also seek the preview to the dragged offset during the drag.
-
-**Add at Playhead:**
-
-The add-keyframe control MUST pass the current playhead/scrub time to the host via `onAddKeyframe(offsetMs)`. Hosts SHOULD insert the new keyframe at that snapped offset, select it after sorting, and seed any already-animated properties from the sampled timeline frame at that time.
-
-#### Scenario: Empty state
-
-- GIVEN no keyframes in the timeline
+- GIVEN a selected track with no keyframes
 - WHEN the editor renders
-- THEN empty state is displayed
+- THEN its lane shows an empty state
 
 #### Scenario: Add and select keyframe
 
-- GIVEN the add button (+)
-- WHEN clicked
-- THEN a new keyframe is added and selected
+- GIVEN a selected type-compatible property track and playhead at tick 500
+- WHEN the add button is clicked
+- THEN a stable typed keyframe is inserted at tick 500 and selected
 
-#### Scenario: Single selection only
+#### Scenario: Single selection and hint
 
-- GIVEN multiple keyframes
+- GIVEN multiple keyframes on visible lanes
 - WHEN a second marker is clicked
 - THEN only the new marker has `aria-pressed="true"`
+- AND its keyframe hint is shown
 
-#### Scenario: Keyframe hint on marker click
+#### Scenario: Dense same-tick stack
 
-- GIVEN a keyframe marker
-- WHEN clicked
-- THEN the keyframe hint is shown
+- GIVEN five keyframes at one tick on the same lane
+- WHEN the lane renders
+- THEN markers fan within the lane and remain individually selectable
+
+#### Scenario: Lane label is not a seek target
+
+- GIVEN a visible lane label
+- WHEN the user clicks it
+- THEN the playhead does not seek
+
+#### Scenario: Presentation time converts once
+
+- GIVEN `ticksPerSecond: 1000` and a user scrub to the 0.5-second ruler label
+- WHEN the boundary conversion runs
+- THEN `onSeekTick(500)` is called and only tick 500 is committed
 
 #### Acceptance Criteria
 
-- [ ] Given no keyframes in the timeline, empty state is displayed
-- [ ] Given the add button (+), a new keyframe is added and selected
-- [ ] Given multiple keyframes, only the new marker has `aria-pressed="true"`
-- [ ] Given a keyframe marker, the keyframe hint is shown
-- [ ] Given keyframes at 500ms and 1200ms, the visible timeline length is at least 2200ms (max offset + 1000ms)
-- [ ] Given no keyframes, the visible timeline length is at least 3000ms
-- [ ] Given ruler markers, time labels use `N.Ns` format (e.g., `0.5s`, `1.0s`)
-- [ ] Given keyframes with different action types, markers are color-coded (setState=accent, addModifier=focus, removeModifier=danger)
-- [ ] Given a click on an empty area of the keyframe track, the playhead moves to that time position
-- [ ] Given a pointer drag on the track, the playhead seeks on pointer-down and every pointer-move
-- [ ] Given a keyframe marker drag, the preview seeks to the dragged offset while the marker is moving
-- [ ] Given the add-keyframe button, the host receives the current playhead time for insertion
-- [ ] Given a selected keyframe, an easing dropdown is available with common presets
-- [ ] Given owner and targeted child keyframes, the track renders separate named scope lanes on one shared time rail
-- [ ] Given a child-targeted keyframe appears earlier than owner keyframes, the owner lane still renders first
-- [ ] Given multiple same-time keyframes in one lane, marker stack offsets remain inside that lane
-- [ ] Given five or more same-time keyframes in one lane, markers remain visually distinguishable
-- [ ] Given a click on a lane label, the playhead does not seek
+- [ ] Empty tracks show an empty state
+- [ ] Add creates a stable type-compatible keyframe on the selected track at an integer tick
+- [ ] Only one keyframe has `aria-pressed="true"`
+- [ ] Clicking a marker shows its keyframe hint
+- [ ] Visible length comes only from explicit `sequence.durationTicks`
+- [ ] Seconds, frames, and timecode remain derived labels over exact ticks
+- [ ] Marker colors represent typed track/value category, not keyframe actions
+- [ ] Pointer scrubbing and marker dragging preview exact ticks continuously
+- [ ] Clicking an empty rail area seeks to its resolved exact tick
+- [ ] Same-tick marker stacks remain inside their lane and selectable
+- [ ] Lane ordering is deterministic from stable target identity
+- [ ] Lane labels never trigger seek
 
 ---
 
 ### Requirement: Keyframe Drag Repositioning
 
-Dragging a keyframe marker along the timeline MUST reposition it to a new time offset. During drag, a visual indicator MUST show the current time position. On drop, the keyframe's time offset MUST be committed at the new position.
+Dragging a marker MUST preview and commit a new integer `keyframe.tick` within `[0, durationTicks]`. The visual indicator shows both the exact tick and selected presentation label. Drop reorders by tick while preserving stable keyframe identity. A move that would collide with a track rule or exceed duration is rejected or resolved by an explicit merge command; it MUST NOT create fractional time.
 
 #### Scenario: Drag marker to new position
 
-- GIVEN a keyframe marker at 500ms in a 2000ms timeline
-- WHEN the marker is dragged to the 75% position
-- THEN the keyframe is repositioned to 1500ms
+- GIVEN a keyframe at tick 500 in a 2000-tick sequence
+- WHEN dragged to 75% of the rail
+- THEN it retains its ID and commits tick 1500
 
 #### Scenario: Visual feedback during drag
 
-- GIVEN a keyframe marker being dragged
-- WHEN the pointer moves along the timeline track
-- THEN a visual indicator shows the current time position with a time label
+- GIVEN a marker is being dragged
+- WHEN the pointer moves
+- THEN the indicator shows candidate tick and the selected seconds/frame/timecode label
 
 #### Acceptance Criteria
 
-- [ ] Given a keyframe marker drag, the keyframe is repositioned to the new time offset
-- [ ] Given a drag in progress, a visual indicator with time label is displayed
+- [ ] Marker drag commits an in-range safe-integer tick
+- [ ] Drag feedback shows exact tick plus derived time label
+- [ ] Stable keyframe identity survives repositioning
+- [ ] Out-of-range or invalid collisions do not commit fractional/invalid time
 
 ---
 
 ### Requirement: Timeline Playback
 
-The system MUST support starting playback. When starting playback, the system MUST NOT pass an onComplete callback.
+Playback controls live in the host shell's Animation toolbar, not inside TimelineEditor. When a sequence is open, Play/Pause and Reset act on that sequence by stable ID and exact tick.
 
-**Playback Controls (Host Shell Responsibility):**
+Starting preview playback MUST NOT attach an `onComplete` callback from TimelineEditor; non-looping stop-at-end behavior belongs to the playback handle and host toolbar state.
 
-Timeline playback controls MUST live in the host shell's Animation toolbar (see `project/spec/demo/layout.md` → Animation Bottom Toolbar), not inside the TimelineEditor. The host shell MUST expose Play/Pause and Reset controls whose behavior switches to timeline-scoped handlers whenever a timeline is open.
+| Control    | Icon         | Behavior                                                         |
+| ---------- | ------------ | ---------------------------------------------------------------- |
+| Play/Pause | Play / Pause | Starts exact-tick transport from playhead; toggles runtime pause |
+| Reset      | RotateCcw    | Stops sequence playback and seeks canonical transport to tick 0  |
 
-| Control    | Icon         | Behavior                                                     |
-| ---------- | ------------ | ------------------------------------------------------------ |
-| Play/Pause | Play / Pause | Starts playback from playhead position; toggles pause        |
-| Reset      | RotateCcw    | Stops playback and resets the timeline playhead to the start |
+The playhead animates with the playback engine via `requestAnimationFrame`, but wall-clock deltas convert through the timebase and never enter canonical data. A non-looping sequence stops at `durationTicks`.
 
-The playhead MUST animate in sync with the playback engine via `requestAnimationFrame`. When playback reaches the end without loop mode, it MUST stop automatically.
-
-**Snapshot Restore on Play:**
-
-Before starting playback or seeking, the system MUST restore the element to its base snapshot state. This ensures the animation always starts from a known visual state rather than accumulating incremental changes.
+Before play or seek, preview resolution MUST start from the canonical base layers (definition/component/page/variables/bindings/state) and evaluate sequences at the requested tick. A captured DOM/style snapshot MAY optimize restoration, but it is runtime-only and cannot replace canonical resolution.
 
 #### Scenario: Playback start
 
-- GIVEN a timeline with keyframes
-- WHEN playback is started via the host Animation toolbar
-- THEN the timeline playback handler is invoked without an onComplete callback
+- GIVEN an open sequence with typed tracks
+- WHEN playback starts through the host Animation toolbar
+- THEN the selected sequence handle starts from the playhead tick without a TimelineEditor `onComplete` callback
+
+#### Scenario: Reset
+
+- GIVEN sequence preview at a nonzero tick
+- WHEN Reset is clicked
+- THEN playback stops and preview resolves at tick 0
 
 #### Acceptance Criteria
 
-- [ ] Given a timeline with keyframes, the timeline playback handler is invoked without onComplete
-- [ ] Given playback starting, the element is restored to its base snapshot state before animation begins
-- [ ] Given the TimelineEditor is open, it does not render its own Play/Pause/Stop buttons
+- [ ] The host toolbar starts/pauses/resets the selected sequence by stable ID
+- [ ] TimelineEditor starts preview without supplying an `onComplete` callback
+- [ ] TimelineEditor renders no duplicate Play/Pause/Stop controls
+- [ ] Reset seeks to tick 0
+- [ ] Preview resolution does not accumulate prior DOM mutations
 
 ---
 
 ### Requirement: Timeline Bottom Panel
 
-The system MUST render with `aria-hidden` when no timeline is being edited. When a timeline is open, the TimelineEditor MUST be rendered. Closing the panel MUST call onClose. Custom height and className props MUST be respected.
+The wrapper MUST use `aria-hidden` when no sequence is being edited. When open, it renders TimelineEditor and closing calls `onClose`. Custom height and className props remain supported.
 
-**Visual Behavior:**
+The panel is fixed at the viewport bottom with 16px side insets, slides with CSS transform, uses `pointer-events: none` while closed, and uses the specified surface background/top radii. A visible HeroUI close button appears in the header.
 
-The bottom panel MUST be fixed-positioned at the bottom of the viewport, with 16px side insets (`TIMELINE_BOTTOM_PANEL_SIDE_INSET_PX`). See `project/spec/demo/layout.md` → Timeline Panel for the full positioning table.
+The header identifies the active sequence and owning document/component plus a concise target subtitle. The editor surfaces selected track, exact tick with presentation label, and preview state (`Playing`, `Paused`, or `Scrubbing`).
 
-The panel MUST slide up from the bottom edge using a CSS transform transition. When closed, it MUST be translated off-screen (`translateY(100%)`) with `pointer-events: none` to avoid blocking canvas interaction. When open, it MUST translate to its natural position (`translateY(0)`) with full interactivity.
+#### Scenario: Hidden when no sequence
 
-The panel MUST have a `var(--surface)` background with top border-radius for visual distinction from the canvas. A close button (X icon) MUST be visible in the panel header to close the timeline editor.
-
-The panel header MUST identify the active timeline and SHOULD include a concise subtitle with the edited target element when known. The TimelineEditor itself MUST surface the edited timeline, target, current time, and preview state (`Playing`, `Paused`, or `Scrubbing`) so the user can distinguish timeline-scoped editing from document-level playback at a glance.
-
-#### Scenario: Hidden when no timeline
-
-- GIVEN no timeline being edited
+- GIVEN no sequence is being edited
 - WHEN the panel renders
-- THEN the wrapper has `aria-hidden`
+- THEN the wrapper has `aria-hidden` and is translated off-screen with no pointer events
 
-#### Scenario: Editor shown when timeline open
+#### Scenario: Editor shown when sequence open
 
-- GIVEN a timeline being edited
-- WHEN the panel renders
-- THEN TimelineEditor is rendered
+- GIVEN a sequence is being edited
+- WHEN the panel renders with custom height/className
+- THEN TimelineEditor is visible and those props are respected
 
 #### Acceptance Criteria
 
-- [ ] Given no timeline being edited, the wrapper has `aria-hidden`
-- [ ] Given a timeline being edited, TimelineEditor is rendered
-- [ ] Given a timeline being edited, the panel and editor identify the timeline, target, current time, and preview state
+- [ ] No active sequence produces `aria-hidden`
+- [ ] An active sequence renders TimelineEditor with sequence owner, target, tick label, and preview state
+- [ ] Closing clears runtime editing state and calls `onClose`
+- [ ] Closed/open transitions use the specified transform, pointer-events, surface, radius, and side-inset behavior
+- [ ] Custom height and className are respected
 
 ---
 
 ### Requirement: Timeline Editing Context
 
-The system MUST start with no target and no snapshot. Opening a timeline MUST set the target and capture a screen snapshot. Closing MUST clear both. Using the context outside a provider MUST return null.
+Runtime editing context starts with no sequence/track target and no preview snapshot. Opening stores stable owner/sequence/track IDs and may capture a resolved preview snapshot. Closing clears them. Using the hook outside its provider returns null. No editor context field is serialized.
 
-#### Scenario: Open sets target and snapshot
+#### Scenario: Open sets stable target
 
-- GIVEN no timeline open
-- WHEN openTimeline is called
-- THEN the target is set and a snapshot is captured
+- GIVEN no sequence open
+- WHEN `openSequence(ownerAddress, sequenceId, trackId)` is called
+- THEN stable target IDs are stored and a resolved preview snapshot is captured
 
-#### Scenario: Close clears state
+#### Scenario: Close clears runtime state
 
-- GIVEN a timeline is open
-- WHEN closeTimeline is called
-- THEN target and snapshot are both null
+- GIVEN a sequence is open
+- WHEN `closeSequence()` is called
+- THEN owner/sequence/track IDs and preview snapshot are null
 
 #### Scenario: Outside provider returns null
 
-- GIVEN a component not wrapped in a provider
-- WHEN the context hook is called
-- THEN it returns null
+- GIVEN a component outside the provider
+- WHEN it calls the context hook
+- THEN the result is null
 
 #### Acceptance Criteria
 
-- [ ] Given no timeline open, the target is set and a snapshot is captured
-- [ ] Given a timeline is open, target and snapshot are both null
-- [ ] Given a component not wrapped in a provider, it returns null
+- [ ] Open stores stable canonical identities rather than element-local animation objects
+- [ ] Close clears target and runtime snapshot
+- [ ] Outside-provider access returns null
 
 ---
 
-### Requirement: Animation Binding Sections
+### Requirement: Lifecycle and State-Machine Authoring Sections
 
-AnimationBindingSections MUST render state and modifier binding UI for the selected element's animation config. State bindings MUST be editable (add, remove, rename). Modifier bindings MUST support pairing in/out timelines.
+The authoring sections MUST edit canonical lifecycle and state-machine structures in the owning document. For component-owned sequences, sequence editing stays within the component definition; document lifecycle and state machines may reference only resolving allowed targets.
 
-#### Scenario: State binding display
+Lifecycle controls edit IN, HOLD/UPDATE, and OUT sequence references by stable ID. State-machine controls edit stable states/transitions, typed triggers, expression guards, unique safe-integer priorities, and optional transition sequence actions.
 
-- GIVEN an element with animation config containing state bindings
-- WHEN the binding sections render
-- THEN each state binding is listed with its associated timeline
+A friendly independent “modifier” toggle creates or edits a two-state machine (`inactive`/`active`) rather than a modifier binding. The UI MAY offer “create reverse exit”: this creates a separate canonical sequence with fresh IDs, reverses keyframe ticks/interpolation compatibly within explicit `durationTicks`, and assigns its ID to the deactivation transition. It does not serialize an in/out timeline pair.
 
-#### Scenario: Add modifier binding
+Ordering remains predictable: lifecycle IN first, custom state machines alphabetically, lifecycle OUT last. State-machine transition order is display-only; semantic selection uses trigger/guard/priority.
 
-- GIVEN an element with animation config
-- WHEN a new modifier binding is added
-- THEN an in/out timeline pair is created for the modifier
+#### Scenario: Lifecycle display
 
-**State Binding Ordering:**
+- GIVEN lifecycle IN references `seq-enter`
+- WHEN the authoring section renders
+- THEN it lists the resolving sequence and opens it by stable ID
 
-State bindings MUST be displayed in a fixed order: `Enter` first, then custom states in alphabetical order, then `Exit` last. This ensures a predictable, scannable list regardless of creation order.
+#### Scenario: Add friendly independent toggle
 
-**Modifier Out-Timeline Default:**
+- GIVEN an owning document and compatible sequence
+- WHEN the user adds a `pulse` toggle with reverse exit
+- THEN a two-state machine and separate activation/deactivation sequence actions are created with fresh stable IDs
 
-When creating a new modifier binding, the out-timeline MUST default to a reversed copy of the in-timeline. This saves the user from manually building the reverse animation for common show/hide patterns.
+#### Scenario: Ordering remains predictable
+
+- GIVEN lifecycle and several custom state machines
+- WHEN the section renders
+- THEN lifecycle IN appears first, custom machine names sort alphabetically, and lifecycle OUT appears last
 
 #### Acceptance Criteria
 
-- [ ] Given an element with state bindings, each binding is listed with its timeline
-- [ ] Given a modifier binding addition, an in/out timeline pair is created
-- [ ] Given state binding removal, the binding and its timeline reference are cleared
-- [ ] Given multiple state bindings, they are ordered: Enter first, custom alphabetically, Exit last
-- [ ] Given a new modifier binding with an in-timeline, the out-timeline defaults to a reversed copy
+- [ ] Lifecycle controls edit stable sequence references
+- [ ] State-machine controls edit typed triggers, guards, priorities, and sequence actions
+- [ ] Friendly toggles compile to canonical two-state machines
+- [ ] Reverse exit creates a separate valid sequence with fresh IDs and type-compatible reversed segments
+- [ ] Removing a referenced sequence requires reference cleanup/reassignment in the same valid atomic command
+- [ ] Lifecycle/custom/lifecycle ordering is predictable without affecting semantic transition priority
 
 ---
 
 ### Requirement: Property Editing Context for Keyframes
 
-When a keyframe is selected in the timeline, property panels MUST switch to keyframe-aware editing mode. Property changes MUST update the selected keyframe's values instead of the element's base values.
+When a keyframe is selected, property panels edit only that keyframe's typed value and compatible outgoing interpolation. The track's `PropertyTarget` determines the property; keyframes do not contain multi-property bags. Without a keyframe selection, panels edit the canonical base property through normal commands.
 
 #### Scenario: Keyframe-aware property edit
 
-- GIVEN a keyframe is selected in the timeline
-- WHEN a property value is changed in a panel
-- THEN the keyframe's property value is updated, not the element's base value
+- GIVEN a keyframe on an opacity track is selected
+- WHEN opacity is changed in the property panel
+- THEN that keyframe's typed value changes and the element's base appearance remains unchanged
 
 #### Acceptance Criteria
 
-- [ ] Given a selected keyframe, property panel edits target the keyframe values
-- [ ] Given no keyframe selected, property panel edits target the element's base values
+- [ ] Selected-keyframe edits preserve track/target value compatibility
+- [ ] No selected keyframe routes edits to base canonical properties
+- [ ] Keyframe editing cannot change target identity implicitly
 
 ---
 
 ### Requirement: Keyframe Deletion
 
-Selected keyframes MUST be deletable via the Delete/Backspace key or a right-click context menu. Deleting a keyframe MUST remove it from the timeline and update the animations array. If the deleted keyframe is the only keyframe in a timeline, the entire timeline entry MUST be removed. Keyframe deletion MUST be undoable.
+Delete/Backspace and context menu delete the selected stable keyframe atomically and undoably. Deleting a track's final keyframe removes the empty track. An empty sequence is removed only when no lifecycle, page, child clip, state-machine, or component reference targets it; otherwise the user must reassign/remove references in the same command.
 
 #### Scenario: Delete key removes selected keyframe
 
-- GIVEN a keyframe is selected
-- WHEN the user presses Delete
-- THEN the keyframe is removed from the timeline
+- GIVEN a selected keyframe
+- WHEN Delete is pressed
+- THEN the keyframe is removed
 
 #### Scenario: Context menu delete
 
-- GIVEN a keyframe is selected
-- WHEN the user right-clicks and selects "Delete Keyframe"
-- THEN the keyframe is removed from the timeline
+- GIVEN a selected keyframe
+- WHEN “Delete Keyframe” is chosen
+- THEN the keyframe is removed
 
-#### Scenario: Last keyframe removes timeline entry
+#### Scenario: Last keyframe removes track
 
-- GIVEN a timeline with a single keyframe
-- WHEN that keyframe is deleted
-- THEN the entire timeline entry is removed
+- GIVEN a track with one keyframe
+- WHEN it is deleted
+- THEN the track is removed and the owning sequence remains if still referenced or otherwise non-empty
 
-#### Scenario: Undo restores deleted keyframe
+#### Scenario: Undo restores deletion
 
-- GIVEN a keyframe was just deleted
-- WHEN the user triggers undo
-- THEN the keyframe is restored
+- GIVEN a keyframe deletion was committed
+- WHEN undo runs
+- THEN the keyframe, stable ID, tick, typed value, and track relationship are restored
 
 #### Acceptance Criteria
 
-- [ ] Given a selected keyframe, pressing Delete removes it from the timeline
-- [ ] Given a selected keyframe, a right-click context menu offers a delete option
-- [ ] Given the last keyframe in a timeline, deleting it removes the timeline entry
-- [ ] Given a deleted keyframe, undo restores it
+- [ ] Keyboard and context-menu deletion remove the selected keyframe
+- [ ] Deleting the final keyframe removes its empty track
+- [ ] Sequence deletion never leaves stale references
+- [ ] Undo restores stable identities and references
 
 ---
 
 ### Requirement: Visual Easing Graph Editor
 
-The timeline editor MUST provide a visual easing curve editor for authoring and previewing interpolation curves. When a keyframe tween is selected (click on the segment between two keyframes), a graph editor panel MUST appear inline below the timeline ruler. The graph editor displays a unit square (0,0 → 1,1) with the current easing curve plotted as a line. For cubic-bezier curves, two control point handles MUST be draggable to modify the curve shape in real time. For named presets (ease, ease-in, ease-out, ease-in-out), the curve MUST display as read-only — the user can switch to custom cubic-bezier to make it editable. For spring presets, the graph MUST show the spring decay curve as read-only with the overshoot visible. The graph editor MUST include a row of preset chips above the curve: `linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, `spring-gentle`, `spring-bouncy`, `spring-stiff`. Clicking a preset chip MUST apply it immediately and update the curve visualization. A real-time animation preview dot MUST travel along the curve while the timeline is scrubbing or playing. The graph editor closes when clicking outside it or selecting a different keyframe.
+Selecting a segment between compatible keyframes opens an inline graph editor. Cubic-Bézier control points are draggable; named presets display read-only until converted to a typed editable Bézier; spring presets show overshoot/decay and edit typed stiffness/damping/mass when allowed. Preset chips map friendly labels (`linear`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, `spring-gentle`, `spring-bouncy`, `spring-stiff`) to closed interpolation records. A preview dot follows normalized segment progress at the current exact tick.
 
-#### Scenario: Open graph editor for tween segment
+#### Scenario: Open graph editor
 
-- GIVEN two keyframes with a tween segment between them
-- WHEN the user clicks the tween segment
-- THEN the graph editor panel appears below the timeline ruler showing the current easing curve
+- GIVEN two compatible keyframes with a segment
+- WHEN the segment is selected
+- THEN the graph opens below the ruler with the current typed curve
 
-#### Scenario: Drag cubic-bezier control handles
+#### Scenario: Drag Bézier handles
 
-- GIVEN the graph editor is open with a custom cubic-bezier curve
-- WHEN the user drags a control point handle
-- THEN the curve updates in real time and the keyframe's interpolation mode value is updated
+- GIVEN an editable cubic-Bézier record
+- WHEN a control handle is dragged
+- THEN typed control points and the curve update in real time
 
-#### Scenario: Apply preset chip
+#### Scenario: Apply preset
 
 - GIVEN the graph editor is open
-- WHEN the user clicks the `ease-in-out` preset chip
-- THEN the interpolation mode is set to `ease-in-out` and the curve visualization updates
+- WHEN `ease-in-out` is selected
+- THEN its typed preset record and visualization apply immediately
 
-#### Scenario: Spring preset displays decay curve
+#### Scenario: Spring and preview
 
-- GIVEN the graph editor is open with interpolation mode `spring-bouncy`
+- GIVEN a spring segment while playback/scrubbing advances
 - WHEN the graph renders
-- THEN the curve shows the spring decay with visible overshoot (values above 1.0)
-
-#### Scenario: Preview dot during playback
-
-- GIVEN the graph editor is open and the timeline is playing
-- WHEN the playhead advances
-- THEN a dot travels along the curve in sync with the playback position
+- THEN overshoot/decay is visible and the preview dot follows normalized exact-tick progress
 
 #### Acceptance Criteria
 
-- [ ] Given a tween segment click, the graph editor appears with the current easing curve
-- [ ] Given a cubic-bezier curve, control handles are draggable and update the interpolation mode
-- [ ] Given a preset chip click, the interpolation mode and visualization update immediately
-- [ ] Given a spring easing, the curve shows the decay with overshoot
-- [ ] Given playback or scrubbing, a preview dot travels along the curve
-- [ ] Given a click outside the graph editor, it closes
+- [ ] Segment selection opens the graph for the track's closed interpolation variant
+- [ ] Bézier handles commit typed control points
+- [ ] Spring display/edits use typed parameters
+- [ ] Incompatible interpolation choices are unavailable
+- [ ] Preview follows exact-tick normalized segment progress
+- [ ] Clicking outside or selecting another keyframe closes the graph
 
 ---
 
-### Requirement: Per-Property Keyframe Lanes
+### Requirement: Per-Property Track Lanes
 
-The timeline editor MUST support an expandable per-property view that displays individual property tracks for the selected element's animation. When the user clicks an expand toggle on an element's timeline row, the row expands to show one horizontal lane per animated property (e.g., `x`, `y`, `opacity`, `backgroundColor`). Each lane shows diamond keyframe markers at the offsets where that specific property has values. Users can add keyframes to individual property lanes by double-clicking at the desired offset — this creates or updates a keyframe at that offset for only that property. Users can drag a property-specific keyframe marker to a different offset — this moves that property's value out of the source keyframe and into a new or existing keyframe at the target offset. The expanded view MUST group properties by category: Geometry (x, y, width, height, rotation), Appearance (opacity, backgroundColor, borderColor, etc.), and Typography (fontSize, color, etc.). When the expand toggle is collapsed, the view returns to the standard monolithic keyframe display. Only one element's properties can be expanded at a time.
+The expanded view shows one lane per canonical property track, grouped for display by target schema category such as Geometry, Appearance, or Typography. Examples use schema-approved targets (exact transform/bounds pointers, appearance opacity/fill-layer pointers, and text run-property pointers), not generic `x`, `backgroundColor`, or `fontSize` bags.
 
-#### Scenario: Expand property lanes
+Double-clicking a lane creates/updates a keyframe on that track at the resolved tick. Dragging a marker changes only that keyframe's tick; it never moves one property out of a multi-property keyframe because each track already owns one typed property. The collapsed overview combines markers visually without changing the underlying track model. Only one element target group expands at a time.
 
-- GIVEN an element row in the timeline with animated properties `x`, `opacity`, and `backgroundColor`
-- WHEN the user clicks the expand toggle
-- THEN three property lanes appear, each showing keyframe markers at the relevant offsets
+#### Scenario: Add keyframe to one track
 
-#### Scenario: Add keyframe to single property lane
+- GIVEN an appearance-opacity track
+- WHEN the user double-clicks its lane at tick 500
+- THEN a type-compatible opacity keyframe is created or updated at tick 500
 
-- GIVEN the property lanes are expanded for `opacity`
-- WHEN the user double-clicks at offset 500ms on the `opacity` lane
-- THEN a keyframe is created (or updated) at 500ms with the current opacity value
+#### Scenario: Drag one track marker
 
-#### Scenario: Drag property keyframe to different offset
+- GIVEN opacity and exact-transform tracks each have a keyframe at tick 300
+- WHEN only the opacity marker is dragged to tick 600
+- THEN opacity moves to tick 600 while the transform keyframe remains at tick 300
 
-- GIVEN a keyframe at 300ms with properties `x: 100` and `opacity: 0.5`
-- WHEN the user drags the `opacity` marker from 300ms to 600ms on the opacity lane
-- THEN `opacity: 0.5` is removed from the 300ms keyframe and placed in a keyframe at 600ms; `x: 100` remains at 300ms
+#### Scenario: Collapse overview
 
-#### Scenario: Collapse back to monolithic view
-
-- GIVEN property lanes are expanded
-- WHEN the user clicks the collapse toggle
-- THEN lanes collapse back to the single-row monolithic keyframe display
+- GIVEN track lanes are expanded
+- WHEN the user collapses them
+- THEN markers combine into the overview without changing canonical tracks/keyframes
 
 #### Scenario: Property categories
 
-- GIVEN an element with animated `x`, `y`, `opacity`, and `fontSize`
-- WHEN property lanes are expanded
-- THEN lanes are grouped: Geometry (x, y), Appearance (opacity), Typography (fontSize)
+- GIVEN tracks targeting geometry transform, appearance opacity, and a text run size
+- WHEN expanded
+- THEN lanes group under Geometry, Appearance, and Typography
 
 #### Acceptance Criteria
 
-- [ ] Given the expand toggle, property lanes are shown with per-property keyframe markers
-- [ ] Given a double-click on a property lane, a property-specific keyframe is created at that offset
-- [ ] Given a property keyframe drag, that property value moves to the target offset independently
-- [ ] Given the collapse toggle, the view returns to monolithic keyframe display
-- [ ] Given animated properties, they are grouped by category (Geometry, Appearance, Typography)
-- [ ] Given multiple elements, only one element's properties can be expanded at a time
+- [ ] Expanded lanes correspond one-to-one with stable canonical tracks
+- [ ] Lane double-click creates a keyframe only on that track
+- [ ] Marker drag preserves track and keyframe identity while changing exact tick
+- [ ] Display categories derive from schema-approved property targets
+- [ ] Collapsing changes presentation only
+- [ ] Only one element target group expands at a time
 
 ---
 
 ## Spec Gaps
 
-- [ ] **Keyframe Deletion:** No automated tests cover Delete/Backspace key handling, context-menu delete, last-keyframe timeline removal, or undo of deletion — component tests needed for the timeline editor keyframe deletion flow.
-- [ ] **Visual Easing Graph Editor:** No automated tests cover graph editor appearance, control handle interaction, preset application, or preview dot behavior — requires CT.
-- [ ] **Per-Property Keyframe Lanes:** No automated tests cover lane expansion, per-property keyframe creation, property value migration between offsets, or category grouping — requires CT.
+- [ ] Keyframe deletion interaction requires component tests.
+- [ ] Easing graph interactions require component tests.
+- [ ] Per-property lane expansion and exact-tick drag require component tests.
+- [ ] Frame-number and timecode ruler label modes (spec MAY) are not yet implemented; labels render seconds only.
+- [ ] Marker pointer-drag repositioning is unit-tested at the widget level; a Playwright CT for the drag gesture remains open.
+- [ ] Per-property lane grouping (Geometry/Appearance/Typography accordion, double-click-to-add on a lane, one-group-expands) is not yet implemented; lanes render flat (one lane per track, deterministic order) and keyframe creation goes through the add button.
+- [ ] Guard-expression editing supports NESTED AND/OR/NOT predicates of `field/variable OPERATOR literal` comparisons — arbitrarily deep groups combining `all`/`any` connectives with an optional negate, built by `TransitionGuardEditor`'s recursive `GuardGroupEditor` and translated via the demo's `v1-guard-action-translation` module's recursive `guardDraftToExpression`/`expressionToGuard`. A model guard whose operand is a function/`get`/`index`/conditional/arithmetic expression, or that otherwise falls outside this AND/OR/NOT-of-comparisons grammar, is detected and shown read-only (`guardIsAdvanced`) rather than edited, and is preserved losslessly until replaced or cleared.
 
 ---
 
@@ -426,5 +417,5 @@ The timeline editor MUST support an expandable per-property view that displays i
 - Property panels → see [panels.md](panels.md)
 - Modal dialogs → see [modals.md](modals.md)
 - Toolbar and navigation → see [toolbar-nav.md](toolbar-nav.md)
-- Timeline zoom or horizontal scroll — the full duration is always visible at the current scale
-- Playback speed control — animations always play at 1× speed
+- Timeline zoom or horizontal scroll—the full explicit sequence duration is visible
+- Playback speed control in this UI—runtime playback defaults to 1×

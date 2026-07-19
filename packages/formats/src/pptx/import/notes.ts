@@ -9,7 +9,7 @@ import {
 } from '../ooxml/ast';
 import { OOXML_REL_TYPES } from '../ooxml/namespaces';
 import type { parseRelationshipsXml } from '../ooxml/relationships';
-import { type OoxmlPackage,readTextPart } from '../ooxml/zip';
+import { type OoxmlPackage, readTextPart } from '../ooxml/zip';
 
 /**
  * Read a slide's notes body by following its `notesSlide` relationship.

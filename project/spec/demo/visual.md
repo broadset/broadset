@@ -179,16 +179,16 @@ Transitions MUST NOT play when restoring state from localStorage on initial load
 
 UI elements MUST respond to application state changes with clear visual feedback:
 
-| State                       | UI Effect                                                                               |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| No element selected         | Properties sidebar shows empty-state message; Animation sidebar shows empty state       |
-| Animations feature disabled | Animation sidebar shows "Animations are disabled" message                               |
-| Element locked              | Property fields rendered as disabled / non-interactive; animation builder dimmed        |
-| No timeline open            | Bottom panel hidden (off-screen, pointer-events disabled)                               |
-| Keyframe editing active     | Property fields show include/exclude toggle buttons; excluded fields at reduced opacity |
-| Multi-select (2+)           | Alignment and Group/Ungroup buttons enabled in toolbar                                  |
-| Multi-select (3+)           | Distribute buttons also enabled                                                         |
-| Placement mode active       | Element library button highlighted; cursor set to crosshair on canvas; banner visible   |
+| State                       | UI Effect                                                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| No element selected         | Properties sidebar shows empty-state message; Animation sidebar shows empty state                                                |
+| Animations feature disabled | Animation sidebar shows "Animations are disabled" message                                                                        |
+| Element locked              | Property fields rendered as disabled / non-interactive; animation builder dimmed                                                 |
+| No timeline open            | Bottom panel hidden (off-screen, pointer-events disabled)                                                                        |
+| Keyframe editing active     | The selected track target shows its typed editor/remove action; other animatable properties show read-only values plus Add Track |
+| Multi-select (2+)           | Alignment and Group/Ungroup buttons enabled in toolbar                                                                           |
+| Multi-select (3+)           | Distribute buttons also enabled                                                                                                  |
+| Placement mode active       | Element library button highlighted; cursor set to crosshair on canvas; banner visible                                            |
 
 #### Scenario: Locked element dims properties
 
