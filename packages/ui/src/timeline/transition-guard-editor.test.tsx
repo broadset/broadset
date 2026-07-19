@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { Mock } from 'vitest';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { GuardClauseDraft, GuardDraft, GuardOperandOption } from './state-machine-editor-types';
@@ -20,14 +21,19 @@ function buildClause(overrides: Partial<GuardClauseDraft> = {}): GuardClauseDraf
   };
 }
 
+const DATE_TIME_OPERAND: GuardOperandOption = { id: 'f4', label: 'Kickoff', valueType: 'date-time' };
+const VALID_UTC_TIMESTAMP = '2025-06-01T12:00:00Z';
+const INVALID_UTC_TIMESTAMP = 'not-a-date';
+
 interface SetupOptions {
   readonly guard?: GuardDraft | undefined;
   readonly guardIsAdvanced?: boolean;
   readonly operands?: readonly GuardOperandOption[];
+  readonly isValidDateTimeLiteral?: (value: string) => boolean;
 }
 
-function setup(options: SetupOptions = {}): { readonly onChange: ReturnType<typeof vi.fn> } {
-  const onChange = vi.fn();
+function setup(options: SetupOptions = {}): { readonly onChange: Mock<(guard: GuardDraft) => void> } {
+  const onChange = vi.fn<(guard: GuardDraft) => void>();
 
   render(
     <TransitionGuardEditor
@@ -36,6 +42,9 @@ function setup(options: SetupOptions = {}): { readonly onChange: ReturnType<type
       operands={options.operands ?? OPERANDS}
       transitionId="t-1"
       onChange={onChange}
+      {...(options.isValidDateTimeLiteral === undefined ?
+        {}
+      : { isValidDateTimeLiteral: options.isValidDateTimeLiteral })}
     />,
   );
 
@@ -162,5 +171,78 @@ describe('TransitionGuardEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clear guard' }));
 
     expect(onChange).toHaveBeenCalledWith({ connective: 'all', clauses: [] });
+  });
+
+  /**
+   * @description Regression for the date-time silent-no-op (PR-F final review, FIX 1): the model's
+   * `utcTimestampSchema` rejects `''`, so a fresh date-time clause must default to a schema-valid
+   * ISO timestamp, not the empty string, or downstream `guardDraftToExpression -> upsertTransition`
+   * rejects the whole edit with zero feedback.
+   */
+  it('defaults a fresh date-time clause literal to a valid, non-empty ISO timestamp', () => {
+    const { onChange } = setup({ guard: undefined, operands: [DATE_TIME_OPERAND] });
+
+    fireEvent.click(screen.getByTestId('sm-transition-t-1-guard-add-clause'));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    const emittedGuard = onChange.mock.calls[0]?.[0];
+
+    if (emittedGuard === undefined) throw new Error('Expected onChange to receive a guard draft');
+
+    const emittedClause = emittedGuard.clauses[0];
+
+    expect(emittedClause?.literal.valueType).toBe('date-time');
+    expect(emittedClause?.literal.value).not.toBe('');
+    expect(typeof emittedClause?.literal.value).toBe('string');
+  });
+
+  /**
+   * @description Regression for the date-time silent-no-op (PR-F final review, FIX 1): typing an
+   * invalid date-time string into the literal Input must NOT emit `onChange` (an invalid literal
+   * must never reach the committed guard) and must mark the Input `aria-invalid`; typing a valid
+   * ISO string emits it and clears the invalid marker.
+   */
+  it('gates date-time literal onChange on isValidDateTimeLiteral and marks the Input invalid', () => {
+    const isValidDateTimeLiteral = (value: string): boolean =>
+      value === VALID_UTC_TIMESTAMP || value === '2000-01-01T00:00:00Z';
+    const { onChange } = setup({
+      guard: {
+        connective: 'all',
+        clauses: [
+          {
+            id: 'clause-1',
+            operandId: 'f4',
+            operator: 'eq',
+            literal: { valueType: 'date-time', value: '2000-01-01T00:00:00Z' },
+          },
+        ],
+      },
+      operands: [DATE_TIME_OPERAND],
+      isValidDateTimeLiteral,
+    });
+
+    const row = screen.getByTestId('sm-transition-t-1-guard-clause-0');
+    const input = within(row).getByLabelText('Guard literal', { selector: 'input' });
+
+    fireEvent.change(input, { target: { value: INVALID_UTC_TIMESTAMP } });
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+
+    fireEvent.change(input, { target: { value: VALID_UTC_TIMESTAMP } });
+
+    expect(onChange).toHaveBeenCalledWith({
+      connective: 'all',
+      clauses: [
+        {
+          id: 'clause-1',
+          operandId: 'f4',
+          operator: 'eq',
+          literal: { valueType: 'date-time', value: VALID_UTC_TIMESTAMP },
+        },
+      ],
+    });
+    expect(input.getAttribute('aria-invalid')).not.toBe('true');
   });
 });

@@ -10,6 +10,11 @@ import { NewTransitionRow, StateMachineTransitionRow } from './state-machine-tra
 
 const ICON_SIZE = 14;
 
+/** Matches `TransitionGuardEditor`'s own default: accepts every date-time literal, i.e. no gating. */
+function acceptAllDateTimeLiterals(): boolean {
+  return true;
+}
+
 function sectionStyle(): { display: 'flex'; flexDirection: 'column'; gap: string } {
   return { display: 'flex', flexDirection: 'column', gap: sp('sp-03') };
 }
@@ -148,6 +153,7 @@ export function StateMachineEditor({
   eventOptions,
   sequenceOptions,
   guardOperands,
+  isValidDateTimeLiteral,
   onAddState,
   onRenameState,
   onRemoveState,
@@ -156,10 +162,12 @@ export function StateMachineEditor({
   onUpdateTransition,
   onRemoveTransition,
 }: StateMachineEditorProps): JSX.Element {
-  // Defaulted once at this boundary: `sequenceOptions`/`guardOperands` are optional on the props
-  // contract so callers that predate per-transition action/guard editing keep compiling unchanged.
+  // Defaulted once at this boundary: `sequenceOptions`/`guardOperands`/`isValidDateTimeLiteral` are
+  // optional on the props contract so callers that predate per-transition action/guard editing keep
+  // compiling unchanged.
   const resolvedSequenceOptions = sequenceOptions ?? [];
   const resolvedGuardOperands = guardOperands ?? [];
+  const resolvedIsValidDateTimeLiteral = isValidDateTimeLiteral ?? acceptAllDateTimeLiterals;
 
   return (
     <section
@@ -194,6 +202,7 @@ export function StateMachineEditor({
             guard={transition.guard}
             guardIsAdvanced={transition.guardIsAdvanced ?? false}
             guardOperands={resolvedGuardOperands}
+            isValidDateTimeLiteral={resolvedIsValidDateTimeLiteral}
             key={transition.id}
             priority={transition.priority}
             sequenceOptions={resolvedSequenceOptions}

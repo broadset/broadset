@@ -16,6 +16,10 @@ import { buildProjectFixture, id, stripClauseIds } from './v1-guard-action-trans
 
 const SEEK_TICK = 500;
 const SCORE_THRESHOLD = 10;
+const ARITHMETIC_LITERAL_VALUE = 1;
+const RED_CHANNEL = 1;
+const NO_CHANNEL = 0;
+const OPAQUE_ALPHA = 1;
 
 describe('guardOperandId', () => {
   it('formats field and variable refs deterministically', () => {
@@ -344,6 +348,56 @@ describe('expressionToGuard: advanced (non-flat) guards', () => {
       operator: 'eq',
       left: { kind: 'field', viewModelId: id('vm-missing'), fieldId: id('field-missing') },
       right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    };
+
+    expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
+  });
+
+  /**
+   * A top-level arithmetic binary (`add`) is a `binary` node, so it clears `flattenGuardTree`'s
+   * `and`/`or` check and reaches `leafToClauseDraft` as a single leaf — this exercises the
+   * `isComparisonOperator` rejection specifically, distinct from the `unary not` case above (which
+   * is rejected earlier, by `leaf.kind !== 'binary'`).
+   */
+  it('flags a top-level arithmetic binary (add) as advanced', () => {
+    const numberFieldExpr: projectFormatV1.ExpressionAst = {
+      kind: 'field',
+      viewModelId: fixture.viewModelId,
+      fieldId: fixture.numberFieldId,
+    };
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'add',
+      left: numberFieldExpr,
+      right: { kind: 'literal', value: { type: 'number', value: ARITHMETIC_LITERAL_VALUE } },
+    };
+
+    expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
+  });
+
+  /** A comparison's LEFT side must be a field/variable operand; a literal on the left has no `GuardOperandRef` to resolve. */
+  it('flags a comparison whose left side is a literal, not a field/variable, as advanced', () => {
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'eq',
+      left: { kind: 'literal', value: { type: 'boolean', value: true } },
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    };
+
+    expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });
+  });
+
+  /** `typedValueToLiteral` only maps boolean/integer/number/string/date-time; a `color` literal has no `GuardValueType` representation. */
+  it('flags a comparison whose right literal has a TypedValue type outside GuardValueType (color) as advanced', () => {
+    const colorLiteral: projectFormatV1.TypedValue = {
+      type: 'color',
+      value: { kind: 'color', space: 'srgb', channels: [RED_CHANNEL, NO_CHANNEL, NO_CHANNEL], alpha: OPAQUE_ALPHA },
+    };
+    const expression: projectFormatV1.ExpressionAst = {
+      kind: 'binary',
+      operator: 'eq',
+      left: booleanFieldExpr,
+      right: { kind: 'literal', value: colorLiteral },
     };
 
     expect(expressionToGuard({ expression, refById })).toEqual({ guard: undefined, guardIsAdvanced: true });

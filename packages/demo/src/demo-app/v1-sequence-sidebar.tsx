@@ -67,6 +67,18 @@ function resolveSequenceName(document: projectFormatV1.BroadsetDocumentV1, seque
   return document.sequences.find(({ id }) => id === sequenceId)?.name ?? sequenceId;
 }
 
+/**
+ * Injected into `StateMachineEditor` as `isValidDateTimeLiteral` so the (model-agnostic)
+ * `TransitionGuardEditor` validation-gates a date-time clause's committed literal against the
+ * REAL model schema instead of its own accept-everything default. Without this, a bad keystroke
+ * on a date-time guard field (e.g. the "Kickoff" view-model field) would be accepted client-side,
+ * then silently rejected at `guardDraftToExpression -> upsertTransition -> isValidProject` with no
+ * user-visible feedback (see PR-F final review, FIX 1).
+ */
+function isValidUtcTimestampLiteral(value: string): boolean {
+  return projectFormatV1.utcTimestampSchema.safeParse(value).success;
+}
+
 function resolveStateMachineName(
   document: projectFormatV1.BroadsetDocumentV1,
   stateMachineId: projectFormatV1.Id,
@@ -422,6 +434,7 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
               <StateMachineEditor
                 eventOptions={toEventOptions(machineView)}
                 guardOperands={guardOperands}
+                isValidDateTimeLiteral={isValidUtcTimestampLiteral}
                 machine={machineView}
                 onAddState={(name) => {
                   state.upsertState(machineId, {

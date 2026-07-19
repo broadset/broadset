@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
 import { guardOperandId } from './v1-guard-action-translation';
+import { buildProjectFixture } from './v1-guard-action-translation.test-support';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
 
 /**
@@ -434,6 +435,132 @@ describe('V1SequenceSidebar', () => {
     const cleared = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
 
     expect(cleared?.guard).toBeUndefined();
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  /**
+   * @description Regression for the date-time silent-no-op (PR-F final review, FIX 1). The model's
+   * `utcTimestampSchema` rejects `''` and any non-ISO-offset string, so before this fix, adding a
+   * guard clause and switching its operand to a date-time view-model field (here, "Live Data /
+   * Kickoff") produced an invalid literal that `guardDraftToExpression -> upsertTransition ->
+   * isValidProject` silently rejected — the store transition kept `guard: undefined` with zero
+   * user-visible feedback. This test drives the real `TransitionGuardEditor` UI end-to-end and
+   * proves both halves of the fix: (1) the freshly-selected date-time clause persists a schema-valid
+   * guard immediately (the library-level valid-by-construction default), and (2) typing an invalid
+   * ISO string is rejected client-side via `aria-invalid` — using the REAL
+   * `projectFormatV1.utcTimestampSchema` injected from this demo, not merely the library's
+   * accept-everything default — so a bad keystroke never reaches the store at all.
+   */
+  it('adds a guard clause on the Kickoff date-time field, producing a schema-valid guard with real-time validation', () => {
+    const fixture = buildProjectFixture({});
+    const store = createProjectEditorStore({ project: fixture.project });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+
+    const primary = fixture.document.stateMachines.find((machine) => machine.name === 'Primary');
+
+    if (primary === undefined) throw new Error('Expected a Primary state machine');
+
+    const transition = primary.transitions[0];
+
+    if (transition === undefined) throw new Error('Expected a seeded transition on Primary');
+
+    const findTransition = (): projectFormatV1.Transition | undefined =>
+      store
+        .getState()
+        .project.documents[0]?.stateMachines.find((machine) => machine.id === primary.id)
+        ?.transitions.find((candidate) => candidate.id === transition.id);
+
+    const editor = screen.getByTestId(`state-machine-editor-${primary.id}`);
+    const row = within(editor).getByTestId(`sm-transition-${transition.id}`);
+
+    fireEvent.click(within(row).getByTestId(`sm-transition-${transition.id}-guard-add-clause`));
+
+    const clauseRow = within(row).getByTestId(`sm-transition-${transition.id}-guard-clause-0`);
+
+    fireEvent.click(within(clauseRow).getByRole('button', { name: /guard operand/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'Live Data / Kickoff' }));
+
+    const withDefaultLiteral = findTransition();
+
+    expect(withDefaultLiteral?.guard).toBeDefined();
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+
+    const literalInput = within(clauseRow).getByLabelText('Guard literal', { selector: 'input' });
+
+    fireEvent.change(literalInput, { target: { value: 'not-a-date' } });
+
+    expect(literalInput.getAttribute('aria-invalid')).toBe('true');
+    expect(findTransition()?.guard).toEqual(withDefaultLiteral?.guard);
+
+    fireEvent.change(literalInput, { target: { value: '2030-05-01T00:00:00Z' } });
+
+    expect(literalInput.getAttribute('aria-invalid')).not.toBe('true');
+
+    const withTypedLiteral = findTransition();
+
+    expect(withTypedLiteral?.guard).not.toEqual(withDefaultLiteral?.guard);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  /**
+   * @description Regression against future refactors (PR-F final review, FIX 4): an ADVANCED
+   * (non-flat) model guard — one `expressionToGuard` cannot represent as a flat `GuardDraft`, e.g. a
+   * `unary not` of a boolean field — must survive an UNRELATED transition edit (here, priority)
+   * losslessly. `onUpdateTransition`'s `{...found, ...}` spread already preserves any guard the
+   * patch doesn't touch; this test guards that invariant against a future refactor that narrows the
+   * spread or special-cases the advanced-guard shape.
+   */
+  it('preserves an advanced (non-flat) guard through an unrelated priority edit', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    const deactivationTransition = flash.transitions.find(
+      ({ targetStateId }) => targetStateId === flash.initialStateId,
+    );
+
+    if (deactivationTransition === undefined) throw new Error('Expected a deactivation transition');
+
+    const document = store.getState().project.documents[0];
+
+    if (document === undefined) throw new Error('Expected a document');
+
+    const { viewModelId, fieldId } = findViewModelField(document, 'showBranding');
+    const advancedGuard: projectFormatV1.ExpressionAst = {
+      kind: 'unary',
+      operator: 'not',
+      operand: { kind: 'field', viewModelId, fieldId },
+    };
+    const seeded = store.getState().upsertTransition(flash.id, { ...deactivationTransition, guard: advancedGuard });
+
+    expect(seeded).toBe(true);
+
+    const withAdvancedGuard = findMachineByName(store, 'Flash')?.transitions.find(
+      ({ id }) => id === deactivationTransition.id,
+    );
+
+    expect(withAdvancedGuard?.guard).toEqual(advancedGuard);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+
+    const editor = screen.getByTestId(`state-machine-editor-${flash.id}`);
+    const row = within(editor).getByTestId(`sm-transition-${deactivationTransition.id}`);
+    const priorityInput = within(row).getByLabelText('Priority', { selector: 'input' });
+
+    fireEvent.change(priorityInput, { target: { value: '7' } });
+    fireEvent.blur(priorityInput);
+
+    const updated = findMachineByName(store, 'Flash')?.transitions.find(
+      (candidate) => candidate.id === deactivationTransition.id,
+    );
+
+    expect(updated?.priority).toBe(7);
+    expect(updated?.guard).toEqual(advancedGuard);
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 });

@@ -1,9 +1,11 @@
 import { Button, Chip, Input, ListBox, Select } from '@heroui/react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { ChangeEvent, JSX } from 'react';
+import { useEffect, useState } from 'react';
 
 import { NumField, ToggleSwitch } from '../inputs';
 import { color, font, sp } from '../tokens';
+import { removeAt, replaceAt } from './editor-array-ops';
 import { rowStyle } from './state-machine-editor-styles';
 import type {
   GuardClauseDraft,
@@ -22,6 +24,14 @@ const ICON_SIZE = 14;
 const INTEGER_LITERAL_STEP = 1;
 const NUMBER_LITERAL_STEP = 0.1;
 const DEFAULT_GUARD: GuardDraft = { connective: 'all', clauses: [] };
+/**
+ * A schema-valid ISO-8601 UTC timestamp (passes the model's `utcTimestampSchema`:
+ * `z.iso.datetime({ offset: true })` plus its offset-suffix regex). `''` does NOT pass that schema,
+ * so a fresh date-time clause must default to this instead — otherwise
+ * `guardDraftToExpression -> upsertTransition -> isValidProject` silently rejects the whole guard
+ * edit the instant a date-time operand is selected (see PR-F final review, FIX 1).
+ */
+const DEFAULT_UTC_TIMESTAMP = '2000-01-01T00:00:00Z';
 
 const BOOLEAN_OPERATORS: readonly GuardOperator[] = ['eq', 'neq'];
 const FULL_OPERATORS: readonly GuardOperator[] = ['eq', 'neq', 'lt', 'lte', 'gt', 'gte'];
@@ -57,128 +67,207 @@ function operatorsForValueType(valueType: GuardValueType): readonly GuardOperato
   return valueType === 'boolean' ? BOOLEAN_OPERATORS : FULL_OPERATORS;
 }
 
-/** A type-appropriate default literal for a freshly selected operand, so the emitted clause always infers to boolean. */
+/**
+ * A type-appropriate default literal for a freshly selected operand, so the emitted clause always
+ * infers to boolean AND is schema-valid the instant it's created. `date-time` MUST default to
+ * {@link DEFAULT_UTC_TIMESTAMP}, never `''` — see that constant's doc for why.
+ */
 function defaultLiteralForValueType(
   valueType: GuardValueType,
   enumValues: readonly string[] | undefined,
 ): GuardLiteralDraft {
   if (valueType === 'boolean') return { valueType, value: false };
   if (valueType === 'integer' || valueType === 'number') return { valueType, value: 0 };
+  if (valueType === 'date-time') return { valueType, value: DEFAULT_UTC_TIMESTAMP };
 
   const firstEnumValue = enumValues?.[0];
 
   return { valueType, value: firstEnumValue ?? '' };
 }
 
-/** Builds a fresh, valid-by-construction clause referencing `operand`, minting a new local clause id. */
-function defaultClauseForOperand(operand: GuardOperandOption): GuardClauseDraft | null {
+interface DefaultClauseFields {
+  readonly operandId: string;
+  readonly operator: GuardOperator;
+  readonly literal: GuardLiteralDraft;
+}
+
+/**
+ * The valid-by-construction {@link operandId}/{@link operator}/{@link literal} triple for a freshly
+ * selected `operand`, deliberately excluding the clause `id` — the two call sites disagree on where
+ * the id comes from (a brand-new id when adding a clause, the existing clause's id when only the
+ * operand changed), so minting it here would either be wrong for one caller or get silently
+ * discarded by the other.
+ */
+function defaultClauseFieldsForOperand(operand: GuardOperandOption): DefaultClauseFields | null {
   const firstOperator = operatorsForValueType(operand.valueType)[0];
 
   if (firstOperator === undefined) return null;
 
   return {
-    id: crypto.randomUUID(),
     operandId: operand.id,
     operator: firstOperator,
     literal: defaultLiteralForValueType(operand.valueType, operand.enumValues),
   };
 }
 
-function replaceClauseAt(
-  clauses: readonly GuardClauseDraft[],
-  index: number,
-  clause: GuardClauseDraft,
-): readonly GuardClauseDraft[] {
-  return clauses.map((existing, i) => (i === index ? clause : existing));
+/* ------------------------------------------------------------------ */
+/*  Date-time literal editor — the only literal kind with an external  */
+/*  schema constraint (utcTimestampSchema), so it validation-gates     */
+/*  onChange instead of emitting every keystroke.                      */
+/* ------------------------------------------------------------------ */
+
+interface GuardDateTimeLiteralEditorProps {
+  readonly value: string;
+  readonly isValidDateTimeLiteral: (value: string) => boolean;
+  readonly onChange: (value: string) => void;
 }
 
-function removeClauseAt(clauses: readonly GuardClauseDraft[], index: number): readonly GuardClauseDraft[] {
-  return clauses.filter((_, i) => i !== index);
+/**
+ * A date-time literal that reaches the committed guard MUST satisfy the model's
+ * `utcTimestampSchema` or `guardDraftToExpression -> upsertTransition` silently rejects the whole
+ * guard edit (see {@link DEFAULT_UTC_TIMESTAMP}). Buffers keystrokes in local state so the field
+ * never blocks typing, but calls `onChange` only once the buffered text passes
+ * `isValidDateTimeLiteral` — an invalid draft stays local, marked `aria-invalid`, and never reaches
+ * the clause.
+ */
+function GuardDateTimeLiteralEditor({
+  value,
+  isValidDateTimeLiteral,
+  onChange,
+}: GuardDateTimeLiteralEditorProps): JSX.Element {
+  const [draftValue, setDraftValue] = useState(value);
+
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
+  const isInvalid = !isValidDateTimeLiteral(draftValue);
+
+  return (
+    <Input
+      aria-invalid={isInvalid || undefined}
+      aria-label="Guard literal"
+      value={draftValue}
+      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+        const nextValue = event.currentTarget.value;
+
+        setDraftValue(nextValue);
+
+        if (isValidDateTimeLiteral(nextValue)) onChange(nextValue);
+      }}
+    />
+  );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Literal editor — switched on the selected operand's valueType      */
+/*  Literal editor — switched on the selected operand's valueType.     */
+/*  Each valueType's editor is its own component so the top-level      */
+/*  dispatcher stays a flat, low-complexity switch.                    */
 /* ------------------------------------------------------------------ */
 
-interface GuardLiteralEditorProps {
-  readonly valueType: GuardValueType;
+interface GuardBooleanLiteralEditorProps {
   readonly literal: GuardLiteralDraft;
-  readonly enumValues: readonly string[] | undefined;
   readonly onChange: (literal: GuardLiteralDraft) => void;
 }
 
-function GuardLiteralEditor({ valueType, literal, enumValues, onChange }: GuardLiteralEditorProps): JSX.Element {
-  if (valueType === 'boolean') {
-    const boolValue = typeof literal.value === 'boolean' ? literal.value : false;
+function GuardBooleanLiteralEditor({ literal, onChange }: GuardBooleanLiteralEditorProps): JSX.Element {
+  const boolValue = typeof literal.value === 'boolean' ? literal.value : false;
 
-    return (
-      <ToggleSwitch
-        ariaLabel="Guard literal"
-        isSelected={boolValue}
-        onChange={(next) => {
-          onChange({ valueType: 'boolean', value: next });
-        }}
-      />
-    );
-  }
+  return (
+    <ToggleSwitch
+      ariaLabel="Guard literal"
+      isSelected={boolValue}
+      onChange={(next) => {
+        onChange({ valueType: 'boolean', value: next });
+      }}
+    />
+  );
+}
 
-  if (valueType === 'integer' || valueType === 'number') {
-    const numValue = typeof literal.value === 'number' ? literal.value : 0;
-    const step = valueType === 'integer' ? INTEGER_LITERAL_STEP : NUMBER_LITERAL_STEP;
+interface GuardNumericLiteralEditorProps {
+  readonly valueType: Extract<GuardValueType, 'integer' | 'number'>;
+  readonly literal: GuardLiteralDraft;
+  readonly onChange: (literal: GuardLiteralDraft) => void;
+}
 
-    return (
-      <NumField
-        label="Guard literal"
-        step={step}
-        value={numValue}
-        onChange={(next) => {
-          if (valueType === 'integer') {
-            const rounded = Math.round(next);
+function GuardNumericLiteralEditor({ valueType, literal, onChange }: GuardNumericLiteralEditorProps): JSX.Element {
+  const numValue = typeof literal.value === 'number' ? literal.value : 0;
+  const step = valueType === 'integer' ? INTEGER_LITERAL_STEP : NUMBER_LITERAL_STEP;
 
-            if (!Number.isSafeInteger(rounded)) return;
+  const commitInteger = (next: number): void => {
+    const rounded = Math.round(next);
 
-            onChange({ valueType: 'integer', value: rounded });
+    if (!Number.isSafeInteger(rounded)) return;
 
-            return;
-          }
+    onChange({ valueType: 'integer', value: rounded });
+  };
 
-          onChange({ valueType: 'number', value: next });
-        }}
-      />
-    );
-  }
+  return (
+    <NumField
+      label="Guard literal"
+      step={step}
+      value={numValue}
+      onChange={(next) => {
+        if (valueType === 'integer') {
+          commitInteger(next);
 
-  if (valueType === 'string' && enumValues !== undefined && enumValues.length > 0) {
-    const stringValue = typeof literal.value === 'string' ? literal.value : '';
+          return;
+        }
 
-    return (
-      <Select
-        aria-label="Guard literal"
-        value={stringValue}
-        onChange={(key) => {
-          if (key === null) return;
+        onChange({ valueType: 'number', value: next });
+      }}
+    />
+  );
+}
 
-          onChange({ valueType: 'string', value: String(key) });
-        }}
-      >
-        <Select.Trigger>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {enumValues.map((enumValue) => (
-              <ListBox.Item id={enumValue} key={enumValue} textValue={enumValue}>
-                {enumValue}
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select>
-    );
-  }
+interface GuardEnumLiteralEditorProps {
+  readonly literal: GuardLiteralDraft;
+  readonly enumValues: readonly string[];
+  readonly onChange: (literal: GuardLiteralDraft) => void;
+}
 
-  // Plain string (no enum schema) or date-time: a free-text ISO/string input.
+function GuardEnumLiteralEditor({ literal, enumValues, onChange }: GuardEnumLiteralEditorProps): JSX.Element {
+  const stringValue = typeof literal.value === 'string' ? literal.value : '';
+
+  return (
+    <Select
+      aria-label="Guard literal"
+      value={stringValue}
+      onChange={(key) => {
+        if (key === null) return;
+
+        onChange({ valueType: 'string', value: String(key) });
+      }}
+    >
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox>
+          {enumValues.map((enumValue) => (
+            <ListBox.Item id={enumValue} key={enumValue} textValue={enumValue}>
+              {enumValue}
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
+  );
+}
+
+interface GuardPlainStringLiteralEditorProps {
+  readonly valueType: GuardValueType;
+  readonly literal: GuardLiteralDraft;
+  readonly onChange: (literal: GuardLiteralDraft) => void;
+}
+
+/** Plain string (no enum schema): a free-text input, no external schema constraint to gate on. */
+function GuardPlainStringLiteralEditor({
+  valueType,
+  literal,
+  onChange,
+}: GuardPlainStringLiteralEditorProps): JSX.Element {
   const textValue = typeof literal.value === 'string' ? literal.value : '';
 
   return (
@@ -192,6 +281,48 @@ function GuardLiteralEditor({ valueType, literal, enumValues, onChange }: GuardL
   );
 }
 
+interface GuardLiteralEditorProps {
+  readonly valueType: GuardValueType;
+  readonly literal: GuardLiteralDraft;
+  readonly enumValues: readonly string[] | undefined;
+  readonly isValidDateTimeLiteral: (value: string) => boolean;
+  readonly onChange: (literal: GuardLiteralDraft) => void;
+}
+
+function GuardLiteralEditor({
+  valueType,
+  literal,
+  enumValues,
+  isValidDateTimeLiteral,
+  onChange,
+}: GuardLiteralEditorProps): JSX.Element {
+  if (valueType === 'boolean') return <GuardBooleanLiteralEditor literal={literal} onChange={onChange} />;
+
+  if (valueType === 'integer' || valueType === 'number') {
+    return <GuardNumericLiteralEditor literal={literal} valueType={valueType} onChange={onChange} />;
+  }
+
+  if (valueType === 'string' && enumValues !== undefined && enumValues.length > 0) {
+    return <GuardEnumLiteralEditor enumValues={enumValues} literal={literal} onChange={onChange} />;
+  }
+
+  if (valueType === 'date-time') {
+    const dateTimeValue = typeof literal.value === 'string' ? literal.value : '';
+
+    return (
+      <GuardDateTimeLiteralEditor
+        isValidDateTimeLiteral={isValidDateTimeLiteral}
+        value={dateTimeValue}
+        onChange={(next) => {
+          onChange({ valueType: 'date-time', value: next });
+        }}
+      />
+    );
+  }
+
+  return <GuardPlainStringLiteralEditor literal={literal} valueType={valueType} onChange={onChange} />;
+}
+
 /* ------------------------------------------------------------------ */
 /*  A single clause row — operand + operator + literal + remove        */
 /* ------------------------------------------------------------------ */
@@ -201,6 +332,7 @@ interface GuardClauseRowProps {
   readonly clause: GuardClauseDraft;
   readonly index: number;
   readonly operands: readonly GuardOperandOption[];
+  readonly isValidDateTimeLiteral: (value: string) => boolean;
   readonly onChangeClause: (clause: GuardClauseDraft) => void;
   readonly onRemove: () => void;
 }
@@ -210,6 +342,7 @@ function GuardClauseRow({
   clause,
   index,
   operands,
+  isValidDateTimeLiteral,
   onChangeClause,
   onRemove,
 }: GuardClauseRowProps): JSX.Element {
@@ -229,11 +362,11 @@ function GuardClauseRow({
 
           if (operand === undefined) return;
 
-          const nextClause = defaultClauseForOperand(operand);
+          const fields = defaultClauseFieldsForOperand(operand);
 
-          if (nextClause === null) return;
+          if (fields === null) return;
 
-          onChangeClause({ ...nextClause, id: clause.id });
+          onChangeClause({ id: clause.id, ...fields });
         }}
       >
         <Select.Trigger>
@@ -282,6 +415,7 @@ function GuardClauseRow({
 
       <GuardLiteralEditor
         enumValues={selectedOperand?.enumValues}
+        isValidDateTimeLiteral={isValidDateTimeLiteral}
         literal={clause.literal}
         valueType={valueType}
         onChange={(literal) => {
@@ -312,7 +446,18 @@ export interface TransitionGuardEditorProps {
   readonly guard: GuardDraft | undefined;
   readonly guardIsAdvanced: boolean;
   readonly operands: readonly GuardOperandOption[];
+  /**
+   * Injected schema check for a date-time literal's committed text, so this presentational package
+   * can validation-gate an ISO timestamp without importing the model's `utcTimestampSchema`
+   * directly. Defaults to accepting every value (no gating) when the host doesn't supply one.
+   */
+  readonly isValidDateTimeLiteral?: (value: string) => boolean;
   readonly onChange: (guard: GuardDraft) => void;
+}
+
+/** Default {@link TransitionGuardEditorProps.isValidDateTimeLiteral}: accepts every candidate literal. */
+function acceptAllDateTimeLiterals(): boolean {
+  return true;
 }
 
 /**
@@ -328,6 +473,7 @@ export function TransitionGuardEditor({
   guard,
   guardIsAdvanced,
   operands,
+  isValidDateTimeLiteral = acceptAllDateTimeLiterals,
   onChange,
 }: TransitionGuardEditorProps): JSX.Element {
   const testId = `sm-transition-${transitionId}-guard`;
@@ -398,14 +544,15 @@ export function TransitionGuardEditor({
         <GuardClauseRow
           clause={clause}
           index={index}
+          isValidDateTimeLiteral={isValidDateTimeLiteral}
           key={clause.id}
           operands={operands}
           transitionId={transitionId}
           onChangeClause={(nextClause) => {
-            onChange({ ...resolvedGuard, clauses: replaceClauseAt(resolvedGuard.clauses, index, nextClause) });
+            onChange({ ...resolvedGuard, clauses: replaceAt(resolvedGuard.clauses, index, nextClause) });
           }}
           onRemove={() => {
-            onChange({ ...resolvedGuard, clauses: removeClauseAt(resolvedGuard.clauses, index) });
+            onChange({ ...resolvedGuard, clauses: removeAt(resolvedGuard.clauses, index) });
           }}
         />
       ))}
@@ -421,9 +568,11 @@ export function TransitionGuardEditor({
 
           if (firstOperand === undefined) return;
 
-          const nextClause = defaultClauseForOperand(firstOperand);
+          const fields = defaultClauseFieldsForOperand(firstOperand);
 
-          if (nextClause === null) return;
+          if (fields === null) return;
+
+          const nextClause: GuardClauseDraft = { id: crypto.randomUUID(), ...fields };
 
           onChange({ ...resolvedGuard, clauses: [...resolvedGuard.clauses, nextClause] });
         }}

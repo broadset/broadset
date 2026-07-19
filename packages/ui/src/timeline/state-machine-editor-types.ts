@@ -116,6 +116,12 @@ export interface StateMachineEditorProps {
   readonly sequenceOptions?: readonly SequenceOptionView[];
   /** Optional so pre-PR-F callers keep compiling; treat an absent value as `[]` at the render boundary. */
   readonly guardOperands?: readonly GuardOperandOption[];
+  /**
+   * Injected schema check for a date-time guard literal's committed text, threaded verbatim into
+   * every transition's {@link GuardOperandOption}-driven guard editor. Optional so pre-PR-F callers
+   * keep compiling; `TransitionGuardEditor` defaults to accepting every value when absent.
+   */
+  readonly isValidDateTimeLiteral?: (value: string) => boolean;
   readonly onAddState: (name: string) => void;
   readonly onRenameState: (stateId: string, name: string) => void;
   readonly onRemoveState: (stateId: string) => void;

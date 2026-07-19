@@ -8,7 +8,7 @@ export function id(value: string): projectFormatV1.Id {
   return projectFormatV1.idSchema.parse(value);
 }
 
-export interface ProjectFixture {
+interface ProjectFixture {
   readonly project: projectFormatV1.BroadsetProjectV1;
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly viewModelId: projectFormatV1.Id;
@@ -28,7 +28,7 @@ export interface ProjectFixture {
   readonly notifyEventId: projectFormatV1.Id;
 }
 
-export interface ProjectFixtureOptions {
+interface ProjectFixtureOptions {
   readonly guard?: projectFormatV1.ExpressionAst;
   readonly actions?: readonly projectFormatV1.SequenceAction[];
 }

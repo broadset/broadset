@@ -72,12 +72,12 @@ function guardValueTypeForFieldSchema(schema: projectFormatV1.ValueSchema): Guar
   }
 }
 
-export interface BuildGuardOperandsInput {
+interface BuildGuardOperandsInput {
   readonly document: projectFormatV1.BroadsetDocumentV1;
   readonly project: projectFormatV1.BroadsetProjectV1;
 }
 
-export interface BuildGuardOperandsResult {
+interface BuildGuardOperandsResult {
   readonly options: readonly GuardOperandOption[];
   readonly refById: ReadonlyMap<string, GuardOperandRef>;
 }
@@ -205,7 +205,7 @@ function clauseToComparison(
   };
 }
 
-export interface GuardDraftToExpressionInput {
+interface GuardDraftToExpressionInput {
   readonly draft: GuardDraft;
   readonly refById: ReadonlyMap<string, GuardOperandRef>;
 }
@@ -318,12 +318,12 @@ function leafToClauseDraft(
   return { id: `${CLAUSE_ID_PREFIX}${String(index)}`, operandId, operator, literal };
 }
 
-export interface ExpressionToGuardInput {
+interface ExpressionToGuardInput {
   readonly expression: projectFormatV1.ExpressionAst | undefined;
   readonly refById: ReadonlyMap<string, GuardOperandRef>;
 }
 
-export interface ExpressionToGuardResult {
+interface ExpressionToGuardResult {
   readonly guard: GuardDraft | undefined;
   readonly guardIsAdvanced: boolean;
 }

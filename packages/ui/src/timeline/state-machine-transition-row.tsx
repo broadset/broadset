@@ -217,6 +217,7 @@ export interface StateMachineTransitionRowProps {
   readonly guard: GuardDraft | undefined;
   readonly guardIsAdvanced: boolean;
   readonly guardOperands: readonly GuardOperandOption[];
+  readonly isValidDateTimeLiteral: (value: string) => boolean;
   readonly onChangeTarget: (targetStateId: string) => void;
   readonly onChangeTrigger: (trigger: TransitionTriggerDraft) => void;
   readonly onChangePriority: (priority: number) => void;
@@ -238,6 +239,7 @@ export function StateMachineTransitionRow({
   guard,
   guardIsAdvanced,
   guardOperands,
+  isValidDateTimeLiteral,
   onChangeTarget,
   onChangeTrigger,
   onChangePriority,
@@ -311,6 +313,7 @@ export function StateMachineTransitionRow({
       <TransitionGuardEditor
         guard={guard}
         guardIsAdvanced={guardIsAdvanced}
+        isValidDateTimeLiteral={isValidDateTimeLiteral}
         operands={guardOperands}
         transitionId={transitionId}
         onChange={onChangeGuard}

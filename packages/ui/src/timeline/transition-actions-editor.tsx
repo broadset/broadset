@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { NumField } from '../inputs';
 import { color, font, sp } from '../tokens';
+import { removeAt, replaceAt } from './editor-array-ops';
 import { rowStyle } from './state-machine-editor-styles';
 import type { SequenceActionDraft, SequenceOptionView } from './state-machine-editor-types';
 
@@ -54,14 +55,6 @@ function defaultDraftForKind(
   if (kind === 'stop-sequence') return { kind: 'stop-sequence', sequenceId: firstSequenceId };
 
   return { kind: 'seek-sequence', sequenceId: firstSequenceId, tick: MIN_TICK };
-}
-
-function replaceAt<T>(items: readonly T[], index: number, item: T): readonly T[] {
-  return items.map((existing, i) => (i === index ? item : existing));
-}
-
-function removeAt<T>(items: readonly T[], index: number): readonly T[] {
-  return items.filter((_, i) => i !== index);
 }
 
 /**
