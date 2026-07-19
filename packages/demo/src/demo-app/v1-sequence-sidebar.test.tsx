@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest';
 
 import { SAMPLE_PROJECT_V1 } from '../sample-project-v1';
+import { guardOperandId } from './v1-guard-action-translation';
 import { V1SequenceSidebar } from './v1-sequence-sidebar';
 
 /**
@@ -54,6 +55,28 @@ function addModifier(name: string): void {
 
 function findMachineByName(store: ProjectEditorStore, name: string): projectFormatV1.StateMachine | undefined {
   return store.getState().project.documents[0]?.stateMachines.find((machine) => machine.name === name);
+}
+
+/** A modifier's activation transition is the one leaving the machine's initial ("inactive") state. */
+function findActivationTransition(machine: projectFormatV1.StateMachine): projectFormatV1.Transition {
+  const transition = machine.transitions.find(({ sourceStateId }) => sourceStateId === machine.initialStateId);
+
+  if (transition === undefined) throw new Error('Expected an activation transition');
+
+  return transition;
+}
+
+function findViewModelField(
+  document: projectFormatV1.BroadsetDocumentV1,
+  fieldName: string,
+): { readonly viewModelId: projectFormatV1.Id; readonly fieldId: projectFormatV1.Id } {
+  for (const viewModel of document.viewModels) {
+    const field = viewModel.fields.find((candidate) => candidate.name === fieldName);
+
+    if (field !== undefined) return { viewModelId: viewModel.id, fieldId: field.id };
+  }
+
+  throw new Error(`Expected a "${fieldName}" view-model field`);
 }
 
 describe('V1SequenceSidebar', () => {
@@ -277,6 +300,140 @@ describe('V1SequenceSidebar', () => {
       });
     }).not.toThrow();
     expect(findMachineByName(store, 'Flash')?.transitions).toEqual(transitionsBefore);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  /**
+   * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
+   * controls edit expression guards, not just typed triggers/priorities. Adding a clause on the
+   * "Live Broadcast Data / Show Network Bug" boolean view-model field and switching its literal to
+   * `true` must produce a valid-by-construction `eq` comparison guard, keep the project
+   * semantically valid, and round-trip back through `expressionToGuard` as a non-advanced draft
+   * (proving the reverse view sees the same guard it just authored).
+   */
+  it('adds a guard clause on a boolean view-model field, producing a valid boolean-equality guard', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    const activation = findActivationTransition(flash);
+    const document = store.getState().project.documents[0];
+
+    if (document === undefined) throw new Error('Expected a document');
+
+    const { viewModelId, fieldId } = findViewModelField(document, 'showBranding');
+    const row = within(screen.getByTestId(`state-machine-editor-${flash.id}`)).getByTestId(
+      `sm-transition-${activation.id}`,
+    );
+
+    fireEvent.click(within(row).getByTestId(`sm-transition-${activation.id}-guard-add-clause`));
+
+    const clauseRow = within(row).getByTestId(`sm-transition-${activation.id}-guard-clause-0`);
+
+    fireEvent.click(within(clauseRow).getByRole('button', { name: /guard operand/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'Live Broadcast Data / Show Network Bug' }));
+    fireEvent.click(within(clauseRow).getByRole('switch', { name: 'Guard literal' }));
+
+    const updated = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
+
+    expect(updated?.guard).toEqual({
+      kind: 'binary',
+      operator: 'eq',
+      left: { kind: 'field', viewModelId, fieldId },
+      right: { kind: 'literal', value: { type: 'boolean', value: true } },
+    });
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+
+    if (capturedStateMachineEditorProps === null) throw new Error('Expected StateMachineEditor to render');
+
+    const reverseTransition = capturedStateMachineEditorProps.machine.transitions.find(
+      ({ id }) => id === activation.id,
+    );
+
+    expect(reverseTransition?.guardIsAdvanced).toBeFalsy();
+    expect(reverseTransition?.guard).toEqual({
+      connective: 'all',
+      clauses: [
+        {
+          id: 'clause-0',
+          operandId: guardOperandId({ kind: 'field', viewModelId, fieldId }),
+          operator: 'eq',
+          literal: { valueType: 'boolean', value: true },
+        },
+      ],
+    });
+  });
+
+  /**
+   * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
+   * controls edit optional transition sequence actions. Clicking "Add action" on a transition (the
+   * default draft is `play-sequence` against the first `sequenceOptions` entry) must append that
+   * action to the store transition and keep the project semantically valid.
+   */
+  it('adds a play-sequence action to a transition', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    const activation = findActivationTransition(flash);
+    const firstSequenceId = store.getState().project.documents[0]?.sequences[0]?.id;
+
+    if (firstSequenceId === undefined) throw new Error('Expected a seeded sequence');
+
+    const row = within(screen.getByTestId(`state-machine-editor-${flash.id}`)).getByTestId(
+      `sm-transition-${activation.id}`,
+    );
+    const addActionRow = within(row).getByTestId(`sm-transition-${activation.id}-add-action`);
+
+    fireEvent.click(within(addActionRow).getByRole('button', { name: 'Add action' }));
+
+    const updated = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
+
+    expect(updated?.actions).toEqual([{ kind: 'play-sequence', sequenceId: firstSequenceId, behavior: 'restart' }]);
+    expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
+  });
+
+  /**
+   * @description timeline.md "Lifecycle and State-Machine Authoring Sections": clearing a guard's
+   * last clause (an empty-clauses `GuardDraft`) must translate back to `undefined` on the store
+   * transition, per `guardDraftToExpression`'s empty-clauses-clears-the-guard contract.
+   */
+  it('clears the guard when the last clause is removed', () => {
+    const store = createProjectEditorStore({ project: SAMPLE_PROJECT_V1 });
+
+    render(<V1SequenceSidebar editorStore={store} />);
+    addModifier('Flash');
+
+    const flash = findMachineByName(store, 'Flash');
+
+    if (flash === undefined) throw new Error('Expected a Flash machine');
+
+    const activation = findActivationTransition(flash);
+    const row = within(screen.getByTestId(`state-machine-editor-${flash.id}`)).getByTestId(
+      `sm-transition-${activation.id}`,
+    );
+
+    fireEvent.click(within(row).getByTestId(`sm-transition-${activation.id}-guard-add-clause`));
+
+    const withClause = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
+
+    expect(withClause?.guard).not.toBeUndefined();
+
+    fireEvent.click(within(row).getByTestId(`sm-transition-${activation.id}-guard-remove-clause-0`));
+
+    const cleared = findMachineByName(store, 'Flash')?.transitions.find(({ id }) => id === activation.id);
+
+    expect(cleared?.guard).toBeUndefined();
     expect(projectFormatV1.validateBroadsetProjectV1Semantics(store.getState().project)).toEqual([]);
   });
 });

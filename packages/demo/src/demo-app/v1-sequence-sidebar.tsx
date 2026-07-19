@@ -11,6 +11,7 @@ import {
   type LifecyclePhase,
   type LifecycleSlotView,
   type SequenceNameView,
+  type SequenceOptionView,
   sp,
   StateMachineEditor,
   type StateMachineEditorView,
@@ -23,6 +24,14 @@ import { useState } from 'react';
 
 import { useEditorSelector } from './helpers';
 import { interpolationToPreset, presetToInterpolation } from './keyframe-interpolation-presets';
+import {
+  actionsDraftToModel,
+  actionToDraft,
+  buildGuardOperands,
+  expressionToGuard,
+  guardDraftToExpression,
+  type GuardOperandRef,
+} from './v1-guard-action-translation';
 
 interface V1SequenceSidebarProps {
   readonly editorStore: ProjectEditorStore;
@@ -105,8 +114,16 @@ function toSequenceNameViews(document: projectFormatV1.BroadsetDocumentV1): read
   return document.sequences.map((sequence) => ({ id: sequence.id, name: sequence.name }));
 }
 
-/** Presentational, string-id-only editor views for every document state machine, host-sorted by name. */
-function toStateMachineEditorViews(document: projectFormatV1.BroadsetDocumentV1): readonly StateMachineEditorView[] {
+/**
+ * Presentational, string-id-only editor views for every document state machine, host-sorted by
+ * name. `refById` (from {@link buildGuardOperands}) resolves each transition's model guard into a
+ * flat {@link expressionToGuard} draft (or `guardIsAdvanced: true` when it doesn't fit), and every
+ * transition's `SequenceAction`s are rendered 1:1 via {@link actionToDraft}.
+ */
+function toStateMachineEditorViews(
+  document: projectFormatV1.BroadsetDocumentV1,
+  refById: ReadonlyMap<string, GuardOperandRef>,
+): readonly StateMachineEditorView[] {
   return [...document.stateMachines]
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((machine) => ({
@@ -114,13 +131,22 @@ function toStateMachineEditorViews(document: projectFormatV1.BroadsetDocumentV1)
       name: machine.name,
       initialStateId: machine.initialStateId,
       states: machine.states.map((state) => ({ id: state.id, name: state.name })),
-      transitions: machine.transitions.map((transition) => ({
-        id: transition.id,
-        sourceStateId: transition.sourceStateId,
-        targetStateId: transition.targetStateId,
-        trigger: transition.trigger,
-        priority: transition.priority,
-      })),
+      transitions: machine.transitions.map((transition) => {
+        const { guard, guardIsAdvanced } = expressionToGuard({ expression: transition.guard, refById });
+
+        return {
+          id: transition.id,
+          sourceStateId: transition.sourceStateId,
+          targetStateId: transition.targetStateId,
+          trigger: transition.trigger,
+          priority: transition.priority,
+          actions: transition.actions.map(actionToDraft),
+          guardIsAdvanced,
+          // `exactOptionalPropertyTypes` forbids assigning `guard: undefined` to the optional
+          // `StateMachineTransitionView.guard` field — omit the key entirely instead.
+          ...(guard === undefined ? {} : { guard }),
+        };
+      }),
     }));
 }
 
@@ -246,6 +272,12 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
 
   const selectedElement = selectActiveElementsV1(state)[0];
   const ticksPerSecond = document.timebase?.ticksPerSecond ?? 1000;
+  const { options: guardOperands, refById } = buildGuardOperands({ document, project: state.project });
+  const sequenceOptions: readonly SequenceOptionView[] = document.sequences.map((sequence) => ({
+    id: sequence.id,
+    name: sequence.name,
+    durationTicks: sequence.durationTicks,
+  }));
 
   const trackById = (sequenceId: string, trackId: string): projectFormatV1.Track | undefined =>
     document.sequences.find(({ id }) => id === sequenceId)?.tracks.find(({ id }) => id === trackId);
@@ -382,13 +414,14 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
         aria-label="State machine editors"
         style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-04') }}
       >
-        {toStateMachineEditorViews(document).map((machineView) => {
+        {toStateMachineEditorViews(document, refById).map((machineView) => {
           const machineId = projectFormatV1.idSchema.parse(machineView.id);
 
           return (
             <div key={machineView.id} style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}>
               <StateMachineEditor
                 eventOptions={toEventOptions(machineView)}
+                guardOperands={guardOperands}
                 machine={machineView}
                 onAddState={(name) => {
                   state.upsertState(machineId, {
@@ -457,8 +490,13 @@ export function V1SequenceSidebar({ editorStore }: V1SequenceSidebarProps): JSX.
                     : { targetStateId: projectFormatV1.idSchema.parse(patch.targetStateId) }),
                     trigger,
                     ...(patch.priority === undefined ? {} : { priority: patch.priority }),
+                    ...(patch.guard === undefined ?
+                      {}
+                    : { guard: guardDraftToExpression({ draft: patch.guard, refById }) }),
+                    ...(patch.actions === undefined ? {} : { actions: actionsDraftToModel(patch.actions) }),
                   });
                 }}
+                sequenceOptions={sequenceOptions}
               />
               <ReverseExitWireControl
                 machineName={machineView.name}

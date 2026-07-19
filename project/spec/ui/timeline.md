@@ -408,7 +408,7 @@ Double-clicking a lane creates/updates a keyframe on that track at the resolved 
 - [ ] Frame-number and timecode ruler label modes (spec MAY) are not yet implemented; labels render seconds only.
 - [ ] Marker pointer-drag repositioning is unit-tested at the widget level; a Playwright CT for the drag gesture remains open.
 - [ ] Per-property lane grouping (Geometry/Appearance/Typography accordion, double-click-to-add on a lane, one-group-expands) is not yet implemented; lanes render flat (one lane per track, deterministic order) and keyframe creation goes through the add button.
-- [ ] Transition guard-expression editing and per-transition sequence-action editing have command-layer support but no dedicated editing UI yet; the `StateMachineEditor` (wired into the demo's animation sidebar) edits states and transition target/trigger/priority, and a sibling reverse-exit control in the same sidebar wires the reverse-exit sequence onto the deactivation transition, but neither surface edits guard expressions or per-transition sequence actions.
+- [ ] Guard-expression editing supports only flat AND/OR predicates of `field/variable OPERATOR literal` comparisons (built by `TransitionGuardEditor`, translated via the demo's `v1-guard-action-translation` module); a model guard using nested/mixed-connective, function/`get`/`index`, or other non-flat expressions is detected and shown read-only (`guardIsAdvanced`) rather than edited, and is preserved losslessly until replaced or cleared. Per-transition `send-event` actions are preserved-but-not-authorable in `TransitionActionsEditor`: an existing one round-trips read-only for lossless editing, but the add-action menu never offers it, because it is runtime-inert in the shipped playback pipeline.
 
 ---
 

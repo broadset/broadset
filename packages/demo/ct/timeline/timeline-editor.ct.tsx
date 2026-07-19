@@ -568,3 +568,119 @@ test('retargeting a modifier machine off Event closes the empty-event-id crash p
   await expect.poll(() => readFlashTransitionCount(page)).toBe(3);
   expect(pageErrors).toEqual([]);
 });
+
+/**
+ * Reads the Flash modifier machine's activation transition (the one leaving its `inactive`
+ * initial state) stable id from the live store, or null if the machine hasn't landed yet.
+ */
+function readFlashActivationTransitionId(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+    const machine = machines.find((candidate) => candidate.name === 'Flash');
+    const activation = machine?.transitions.find(({ sourceStateId }) => sourceStateId === machine.initialStateId);
+
+    return activation?.id ?? null;
+  });
+}
+
+/** Reads one transition's guard expression from the live store by stable transition id, or null. */
+function readTransitionGuard(page: Page, transitionId: string): Promise<unknown> {
+  return page.evaluate((id) => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+
+    for (const machine of machines) {
+      const transition = machine.transitions.find((candidate) => candidate.id === id);
+
+      if (transition !== undefined) return transition.guard ?? null;
+    }
+
+    return null;
+  }, transitionId);
+}
+
+/** Reads one transition's sequence actions from the live store by stable transition id. */
+function readTransitionActions(page: Page, transitionId: string): Promise<unknown> {
+  return page.evaluate((id) => {
+    const machines = window.__broadsetProjectEditorStore?.getState().project.documents[0]?.stateMachines ?? [];
+
+    for (const machine of machines) {
+      const transition = machine.transitions.find((candidate) => candidate.id === id);
+
+      if (transition !== undefined) return transition.actions;
+    }
+
+    return null;
+  }, transitionId);
+}
+
+/**
+ * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
+ * controls edit expression guards, not just typed triggers/priorities. Clicking "Add clause" on a
+ * transition (the default clause references the demo's first `guardOperands` entry — the "Live
+ * Broadcast Data" view model's `homeAbbr` field, resolved by `buildGuardOperands`) must set a
+ * valid-by-construction guard expression referencing that real document field on the store
+ * transition. Regions: animation panel (state-machine editor) → store.
+ */
+test('adding a guard clause to a modifier transition sets a field-comparison guard on the store', async ({
+  mount,
+  page,
+}) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+
+  const machineId = await readFlashMachineId(page);
+
+  if (machineId === null) throw new Error('expected Flash machine id');
+
+  const activationId = await readFlashActivationTransitionId(page);
+
+  if (activationId === null) throw new Error('expected an activation transition');
+
+  const editor = page.getByTestId(`state-machine-editor-${machineId}`);
+  const row = editor.getByTestId(`sm-transition-${activationId}`);
+
+  await row.getByTestId(`sm-transition-${activationId}-guard-add-clause`).click();
+
+  await expect.poll(() => readTransitionGuard(page, activationId)).not.toBeNull();
+  expect(await readTransitionGuard(page, activationId)).toEqual({
+    kind: 'binary',
+    operator: 'eq',
+    left: { kind: 'field', viewModelId: 'demo-live-data', fieldId: 'field-homeAbbr' },
+    right: { kind: 'literal', value: { type: 'string', value: '' } },
+  });
+});
+
+/**
+ * @description timeline.md "Lifecycle and State-Machine Authoring Sections": state-machine
+ * controls edit optional transition sequence actions. Clicking "Add action" on a transition (the
+ * default draft is `play-sequence` against the first `sequenceOptions` entry) must append that
+ * action to the store transition. Regions: animation panel (state-machine editor) → store.
+ */
+test('adding a sequence action to a modifier transition appends it to the store', async ({ mount, page }) => {
+  await mount(<DemoAppFresh />);
+  await selectLayer(page, 'Score Bug');
+  await openTab(page, 'Animation');
+  await page.getByRole('textbox', { name: 'New modifier name' }).fill('Flash');
+  await page.getByRole('button', { name: 'Add modifier' }).click();
+
+  const machineId = await readFlashMachineId(page);
+
+  if (machineId === null) throw new Error('expected Flash machine id');
+
+  const activationId = await readFlashActivationTransitionId(page);
+
+  if (activationId === null) throw new Error('expected an activation transition');
+
+  const editor = page.getByTestId(`state-machine-editor-${machineId}`);
+  const row = editor.getByTestId(`sm-transition-${activationId}`);
+  const addActionRow = row.getByTestId(`sm-transition-${activationId}-add-action`);
+
+  await addActionRow.getByRole('button', { name: 'Add action' }).click();
+
+  await expect
+    .poll(() => readTransitionActions(page, activationId))
+    .toEqual([{ kind: 'play-sequence', sequenceId: 'tl-live-pulse', behavior: 'restart' }]);
+});
