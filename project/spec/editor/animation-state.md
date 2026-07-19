@@ -79,7 +79,7 @@ Property-track commands MUST address owner, sequence, track, and keyframe entiti
 
 ### Requirement: Lifecycle Binding Integrity
 
-The system MUST set and remove the document's optional IN, HOLD/UPDATE, and OUT lifecycle phase actions using resolving stable sequence addresses or typed state-machine events. IN and OUT are fixed lifecycle phase slots in the authoring view, not removable custom states and not synthetic entries in a per-element configuration array. An empty slot MAY be displayed without serializing a binding. Each committed action MUST validate its referenced sequence or state-machine event in the document's permitted identity scope.
+The system MUST set and remove the document's optional IN, HOLD/UPDATE, and OUT lifecycle phase actions using resolving stable sequence addresses (play-sequence, stop-sequence, seek-sequence). IN and OUT are fixed lifecycle phase slots in the authoring view, not removable custom states and not synthetic entries in a per-element configuration array. An empty slot MAY be displayed without serializing a binding. Each committed action MUST validate its referenced sequence in the document's permitted identity scope. State machines are driven entirely by their own transition triggers (event/lifecycle/after), with external events supplied by the host runtime — lifecycle phase actions do not dispatch state-machine events.
 
 #### Scenario: Lifecycle action replacement is phase-scoped
 
@@ -96,7 +96,7 @@ The system MUST set and remove the document's optional IN, HOLD/UPDATE, and OUT 
 #### Acceptance Criteria
 
 - [ ] Given an existing lifecycle phase action, setting it again replaces only that phase
-- [ ] Given an unresolved sequence or state-machine event reference, the transaction fails
+- [ ] Given an unresolved sequence reference, the transaction fails
 - [ ] IN and OUT remain fixed phase slots while optional HOLD/UPDATE actions retain deterministic order
 - [ ] Empty authoring slots do not create element-local bindings or placeholder canonical objects
 
@@ -121,7 +121,7 @@ The system MUST add, update, remove, and reorder document-owned state machines, 
 #### Acceptance Criteria
 
 - [ ] Given an existing state-machine entity ID, a mutation affects only that entity
-- [ ] Given a stale state, transition, sequence-action, or event reference, the whole transaction fails
+- [ ] Given a stale state, transition, or sequence-action reference, the whole transaction fails
 - [ ] Reordering uses stable identity and preserves deterministic transition priority semantics
 - [ ] Friendly modifier controls serialize independent state machines rather than modifier bindings
 

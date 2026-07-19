@@ -277,7 +277,7 @@ The animation builder MUST be organized as a HeroUI `Accordion` with these secti
 
 | Section         | Content                                                                                                                                                                                |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lifecycle       | IN, HOLD/UPDATE, and OUT phase controls referencing resolving sequence IDs or typed state-machine events                                                                               |
+| Lifecycle       | IN, HOLD/UPDATE, and OUT phase controls referencing resolving sequence IDs (play/stop/seek)                                                                                            |
 | Sequences       | Lists document/component sequences with Edit, Rename, Duplicate, Delete, and Add Sequence actions; Quick Setup creates explicit IN/OUT sequences with typed tracks and `durationTicks` |
 | Property tracks | Stable typed tracks targeting the selected element through `PropertyTarget`; opens TimelineEditor for exact-tick keyframe editing                                                      |
 | State machines  | Stable states/transitions, typed triggers and guards, deterministic priority, and optional transition sequence actions; friendly independent toggles compile to two-state machines     |

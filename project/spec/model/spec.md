@@ -87,12 +87,12 @@ view model.
 
 ### Requirement: Document Sequences and Lifecycle
 
-`sequences` MUST be an ordered collection of stable sequence definitions using the document timebase. Optional `lifecycle` maps IN, HOLD/UPDATE, and OUT behavior to resolving sequence or state-machine actions. Every timed cross-reference MUST resolve.
+`sequences` MUST be an ordered collection of stable sequence definitions using the document timebase. Optional `lifecycle` maps IN, HOLD/UPDATE, and OUT behavior to resolving sequence actions. Every timed cross-reference MUST resolve.
 
 #### Acceptance Criteria
 
-- [ ] Given lifecycle bindings to existing sequences or events, validation succeeds
-- [ ] Given a missing sequence, state-machine event, track target, or cue asset, semantic validation fails
+- [ ] Given lifecycle bindings to existing sequences, validation succeeds
+- [ ] Given a missing sequence, track target, or cue asset, semantic validation fails
 - [ ] Given direct evaluation and sequential playback at the same tick and event log, both produce the same declarative state
 
 ### Requirement: State Machines

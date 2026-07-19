@@ -159,7 +159,7 @@ The demo MUST load a canonical sample project on startup that exercises text, im
 - [ ] Given the sample project, it includes text, image, vector rectangle/path, video, clock, and ticker elements
 - [ ] Given the sample project, it includes stable sequence/lifecycle bindings and typed live-data bindings
 - [ ] Given the sample project, at least one sequence targets an element's exact transform through a stable property address
-- [ ] Given the sample project, lifecycle IN and OUT actions resolve by stable address to sequences, or to state-machine events whose selected transitions start sequences, with resulting property tracks targeting at least one element
+- [ ] Given the sample project, lifecycle IN and OUT actions resolve by stable address to sequences, with resulting property tracks targeting at least one element
 
 ---
 

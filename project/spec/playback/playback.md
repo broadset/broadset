@@ -188,7 +188,7 @@ The system MUST support a runtime `suppressTransitions` flag that applies the ta
 
 ### Requirement: Lifecycle and State-Machine Transitions
 
-The system MUST animate lifecycle changes through canonical IN/HOLD-UPDATE/OUT sequence or event references and state-machine changes through transition sequence actions. When no lifecycle sequence is declared, effective instance visibility applies directly. When a transition supersedes an incompatible active transition action on the same target/property, deterministic resolution stops or overrides the earlier control according to canonical precedence.
+The system MUST animate lifecycle changes through canonical IN/HOLD-UPDATE/OUT sequence references and state-machine changes through transition sequence actions. When no lifecycle sequence is declared, effective instance visibility applies directly. When a transition supersedes an incompatible active transition action on the same target/property, deterministic resolution stops or overrides the earlier control according to canonical precedence.
 
 #### Scenario: Becoming visible plays lifecycle IN sequence
 
@@ -198,7 +198,7 @@ The system MUST animate lifecycle changes through canonical IN/HOLD-UPDATE/OUT s
 
 #### Scenario: No lifecycle sequence applies visibility directly
 
-- GIVEN no lifecycle OUT sequence or event is declared
+- GIVEN no lifecycle OUT sequence is declared
 - WHEN effective instance visibility becomes false
 - THEN `visibility:hidden` is set directly
 
