@@ -405,15 +405,12 @@ describe('expressionToGuard: advanced (non-flat) guards', () => {
 });
 
 describe('actionToDraft / actionDraftToModel', () => {
-  it('round-trips play-sequence, stop-sequence, seek-sequence, and send-event', () => {
+  it('round-trips play-sequence, stop-sequence, and seek-sequence', () => {
     const seqId = id('seq-intro');
-    const machineId = id('machine-notifier');
-    const eventId = id('evt-notify');
     const actions: readonly projectFormatV1.SequenceAction[] = [
       { kind: 'play-sequence', sequenceId: seqId, behavior: 'resume' },
       { kind: 'stop-sequence', sequenceId: seqId },
       { kind: 'seek-sequence', sequenceId: seqId, tick: 42 },
-      { kind: 'send-event', stateMachineId: machineId, eventId },
     ];
 
     for (const action of actions) {
@@ -425,8 +422,6 @@ describe('actionToDraft / actionDraftToModel', () => {
     expect(actionDraftToModel({ kind: 'play-sequence', sequenceId: '', behavior: 'restart' })).toBeNull();
     expect(actionDraftToModel({ kind: 'stop-sequence', sequenceId: '' })).toBeNull();
     expect(actionDraftToModel({ kind: 'seek-sequence', sequenceId: '', tick: 0 })).toBeNull();
-    expect(actionDraftToModel({ kind: 'send-event', stateMachineId: '', eventId: 'evt' })).toBeNull();
-    expect(actionDraftToModel({ kind: 'send-event', stateMachineId: 'machine', eventId: '' })).toBeNull();
   });
 });
 
@@ -497,7 +492,6 @@ describe('semantic validity', () => {
       { kind: 'play-sequence', sequenceId: base.sequenceId, behavior: 'restart' },
       { kind: 'seek-sequence', sequenceId: base.sequenceId, tick: SEEK_TICK },
       { kind: 'stop-sequence', sequenceId: base.sequenceId },
-      { kind: 'send-event', stateMachineId: base.notifierMachineId, eventId: base.notifyEventId },
     ];
     const fixture = buildProjectFixture({ guard, actions: actionsDraftToModel(actionDrafts) });
 

@@ -173,18 +173,22 @@ jitter deterministic.
 
 ### Requirement: Lifecycle
 
-Optional document lifecycle maps IN, HOLD/UPDATE, and OUT phases to resolving sequences or state-machine events. Lifecycle state is runtime evaluation input and MUST NOT duplicate mutable playback state in canonical data.
+Optional document lifecycle maps IN, HOLD/UPDATE, and OUT phases to resolving sequence actions. Lifecycle state is runtime evaluation input and MUST NOT duplicate mutable playback state in canonical data.
 
 #### Acceptance Criteria
 
-- [ ] Given valid lifecycle sequence and event references, semantic validation succeeds
+- [ ] Given valid lifecycle sequence references, semantic validation succeeds
 - [ ] Given an unresolved lifecycle target, validation fails
 - [ ] Given the same lifecycle phase, event log, and tick, evaluation is deterministic
 
 Lifecycle and state-machine actions use stable IDs and are the closed union `play-sequence`
-`{sequenceId, behavior:'restart'|'resume'}`, `stop-sequence` `{sequenceId}`, `seek-sequence`
-`{sequenceId,tick}`, or `send-event` `{stateMachineId,eventId}`. A `LifecycleDefinition` has stable
-`id` and required ordered `in`, `hold`, `update`, and `out` action arrays; arrays may be empty.
+`{sequenceId, behavior:'restart'|'resume'}`, `stop-sequence` `{sequenceId}`, or `seek-sequence`
+`{sequenceId,tick}`. A `LifecycleDefinition` has stable `id` and required ordered `in`, `hold`,
+`update`, and `out` action arrays; arrays may be empty. State machines are driven entirely by their
+transition triggers (`event`/`lifecycle`/`after`), with external events supplied by the host
+runtime; there is no action that dispatches a state-machine event directly. A prior fourth action
+variant that did so was removed: it was runtime-inert (playback never dispatched it) and its
+intended uses are already covered by transition triggers.
 
 ### Requirement: State Machines
 

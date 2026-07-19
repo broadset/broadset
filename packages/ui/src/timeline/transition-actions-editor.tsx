@@ -1,4 +1,4 @@
-import { Button, Chip, ListBox, Select } from '@heroui/react';
+import { Button, ListBox, Select } from '@heroui/react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import type { JSX } from 'react';
 import { useState } from 'react';
@@ -17,7 +17,7 @@ const ICON_SIZE = 14;
 const MIN_TICK = 0;
 const TICK_STEP = 1;
 
-type AddableActionKind = Exclude<SequenceActionDraft['kind'], 'send-event'>;
+type AddableActionKind = SequenceActionDraft['kind'];
 type PlaySequenceBehavior = Extract<SequenceActionDraft, { readonly kind: 'play-sequence' }>['behavior'];
 
 const ADDABLE_ACTION_KIND_OPTIONS: readonly AddableActionKind[] = ['play-sequence', 'stop-sequence', 'seek-sequence'];
@@ -284,43 +284,34 @@ function TransitionActionRow({
     );
   }
 
-  if (action.kind === 'seek-sequence') {
-    const maxTick = resolveMaxTick(sequenceOptions, action.sequenceId, action.tick);
+  // seek-sequence: the only remaining kind after play-sequence and stop-sequence have been ruled out.
+  const maxTick = resolveMaxTick(sequenceOptions, action.sequenceId, action.tick);
 
-    return (
-      <div data-testid={testId} style={rowStyle()}>
-        <SequenceSelect
-          sequenceId={action.sequenceId}
-          sequenceOptions={sequenceOptions}
-          onChange={(sequenceId) => {
-            const clampedTick = Math.min(action.tick, resolveMaxTick(sequenceOptions, sequenceId, action.tick));
-
-            onChangeAction({ ...action, sequenceId, tick: clampedTick });
-          }}
-        />
-        <NumField
-          label="Tick"
-          min={MIN_TICK}
-          step={TICK_STEP}
-          value={action.tick}
-          onChange={(value) => {
-            const tick = Math.round(value);
-
-            if (!Number.isSafeInteger(tick) || tick < MIN_TICK) return;
-            if (tick > maxTick) return;
-
-            onChangeAction({ ...action, tick });
-          }}
-        />
-        {controls}
-      </div>
-    );
-  }
-
-  // send-event: runtime-inert in the shipped pipeline — preserved read-only for lossless round-trip.
   return (
     <div data-testid={testId} style={rowStyle()}>
-      <Chip size="sm">Send event (host-dispatched)</Chip>
+      <SequenceSelect
+        sequenceId={action.sequenceId}
+        sequenceOptions={sequenceOptions}
+        onChange={(sequenceId) => {
+          const clampedTick = Math.min(action.tick, resolveMaxTick(sequenceOptions, sequenceId, action.tick));
+
+          onChangeAction({ ...action, sequenceId, tick: clampedTick });
+        }}
+      />
+      <NumField
+        label="Tick"
+        min={MIN_TICK}
+        step={TICK_STEP}
+        value={action.tick}
+        onChange={(value) => {
+          const tick = Math.round(value);
+
+          if (!Number.isSafeInteger(tick) || tick < MIN_TICK) return;
+          if (tick > maxTick) return;
+
+          onChangeAction({ ...action, tick });
+        }}
+      />
       {controls}
     </div>
   );
@@ -399,9 +390,8 @@ export interface TransitionActionsEditorProps {
 }
 
 /**
- * Presentational, ordered editor for one transition's `SequenceAction` drafts. Runtime-LIVE kinds
- * (play/stop/seek-sequence) are fully editable and addable; `send-event` is preserved read-only
- * because it is not dispatched by the shipped playback pipeline (see `SequenceActionDraft`).
+ * Presentational, ordered editor for one transition's `SequenceAction` drafts. All three kinds
+ * (play/stop/seek-sequence) are fully editable and addable (see `SequenceActionDraft`).
  */
 export function TransitionActionsEditor({
   transitionId,

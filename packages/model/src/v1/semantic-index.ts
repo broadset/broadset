@@ -45,7 +45,6 @@ export interface DocumentSemanticIndex {
   readonly pages: ReadonlyMap<Id, BroadsetDocumentV1['pages'][number]>;
   readonly pageRoots: ReadonlyMap<Id, ReadonlyMap<Id, BroadsetDocumentV1['pages'][number]['rootInstances'][number]>>;
   readonly stateMachines: ReadonlyMap<Id, BroadsetDocumentV1['stateMachines'][number]>;
-  readonly stateMachineEvents: ReadonlyMap<Id, ReadonlySet<Id>>;
   readonly viewModels: ReadonlyMap<string, ViewModelSemanticIndex>;
   readonly bindings: ReadonlySet<Id>;
   readonly guides: ReadonlyMap<Id, BroadsetDocumentV1['surface']['guides'][number]>;
@@ -160,10 +159,6 @@ function createDocumentIndex(projectId: Id, document: BroadsetDocumentV1): Docum
     pages,
     pageRoots: new Map(document.pages.map((page) => [page.id, indexById(page.rootInstances)])),
     stateMachines: indexById(document.stateMachines),
-    stateMachineEvents: new Map(document.stateMachines.map((machine) => [
-      machine.id,
-      new Set(machine.transitions.flatMap((transition) => transition.trigger.kind === 'event' ? [transition.trigger.eventId] : [])),
-    ])),
     viewModels: new Map<string, ViewModelSemanticIndex>(
       document.viewModels.map((viewModel) => [viewModel.id, createViewModelIndex(viewModel)]),
     ),

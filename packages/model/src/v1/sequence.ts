@@ -255,8 +255,7 @@ export const sequenceSchema: z.ZodType<Sequence> = z.strictObject({
 export type SequenceAction =
   | { readonly kind: 'play-sequence'; readonly sequenceId: Id; readonly behavior: 'restart' | 'resume' }
   | { readonly kind: 'stop-sequence'; readonly sequenceId: Id }
-  | { readonly kind: 'seek-sequence'; readonly sequenceId: Id; readonly tick: number }
-  | { readonly kind: 'send-event'; readonly stateMachineId: Id; readonly eventId: Id };
+  | { readonly kind: 'seek-sequence'; readonly sequenceId: Id; readonly tick: number };
 
 export interface LifecycleDefinition {
   readonly id: Id;
@@ -302,7 +301,6 @@ export const sequenceActionSchema: z.ZodType<SequenceAction> = z.discriminatedUn
   z.strictObject({ kind: z.literal('play-sequence'), sequenceId: idSchema, behavior: z.enum(['restart', 'resume']) }),
   z.strictObject({ kind: z.literal('stop-sequence'), sequenceId: idSchema }),
   z.strictObject({ kind: z.literal('seek-sequence'), sequenceId: idSchema, tick: nonNegativeSafeIntegerSchema }),
-  z.strictObject({ kind: z.literal('send-event'), stateMachineId: idSchema, eventId: idSchema }),
 ]);
 
 export const lifecycleDefinitionSchema: z.ZodType<LifecycleDefinition> = z.strictObject({

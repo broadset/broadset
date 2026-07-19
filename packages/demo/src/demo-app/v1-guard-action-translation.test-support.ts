@@ -24,8 +24,6 @@ interface ProjectFixture {
   readonly flagVariableId: projectFormatV1.Id;
   readonly lengthVariableId: projectFormatV1.Id;
   readonly sequenceId: projectFormatV1.Id;
-  readonly notifierMachineId: projectFormatV1.Id;
-  readonly notifyEventId: projectFormatV1.Id;
 }
 
 interface ProjectFixtureOptions {
@@ -34,9 +32,9 @@ interface ProjectFixtureOptions {
 }
 
 /**
- * Builds a full, semantically-valid motion project with a view model, project variables, two
- * sequences-worth of state-machine plumbing, and a guarded transition whose guard/actions are
- * injected by the caller. Used both for pure translation-function tests (which only read
+ * Builds a full, semantically-valid motion project with a view model, project variables, a
+ * sequence-driving state machine, and a guarded transition whose guard/actions are injected by
+ * the caller. Used both for pure translation-function tests (which only read
  * `document.viewModels` / `project.resources.variables`) and for the semantic-validity tests, which
  * need the whole graph to resolve.
  */
@@ -57,13 +55,9 @@ export function buildProjectFixture(options: ProjectFixtureOptions): ProjectFixt
   const lengthVariableId = id('var-length');
   const sequenceId = id('seq-intro');
   const primaryMachineId = id('machine-primary');
-  const notifierMachineId = id('machine-notifier');
-  const notifyEventId = id('evt-notify');
   const triggerEventId = id('evt-trigger');
   const sourceStateId = id('state-source');
   const targetStateId = id('state-target');
-  const notifierSourceId = id('state-notify-source');
-  const notifierTargetId = id('state-notify-target');
 
   const document: projectFormatV1.BroadsetDocumentV1 = {
     id: id('document'),
@@ -128,25 +122,6 @@ export function buildProjectFixture(options: ProjectFixtureOptions): ProjectFixt
             ...(options.guard === undefined ? {} : { guard: options.guard }),
             priority: 0,
             actions: options.actions ?? [],
-          },
-        ],
-      },
-      {
-        id: notifierMachineId,
-        name: 'Notifier',
-        initialStateId: notifierSourceId,
-        states: [
-          { id: notifierSourceId, name: 'Idle', values: [], entryActions: [], exitActions: [] },
-          { id: notifierTargetId, name: 'Notified', values: [], entryActions: [], exitActions: [] },
-        ],
-        transitions: [
-          {
-            id: id('transition-notifier'),
-            sourceStateId: notifierSourceId,
-            targetStateId: notifierTargetId,
-            trigger: { kind: 'event', eventId: notifyEventId },
-            priority: 0,
-            actions: [],
           },
         ],
       },
@@ -236,8 +211,6 @@ export function buildProjectFixture(options: ProjectFixtureOptions): ProjectFixt
     flagVariableId,
     lengthVariableId,
     sequenceId,
-    notifierMachineId,
-    notifyEventId,
   };
 }
 

@@ -313,7 +313,7 @@ export const EXPECTED_DISCRIMINATED_UNION_VARIANTS = {
   interpolation: ['hold', 'step', 'cubic-bezier', 'spring', 'spatial-path', 'counting', 'color'],
   cue: ['audio', 'event'],
   clipRemap: ['linear', 'freeze'],
-  sequenceAction: ['play-sequence', 'stop-sequence', 'seek-sequence', 'send-event'],
+  sequenceAction: ['play-sequence', 'stop-sequence', 'seek-sequence'],
   transitionTrigger: ['event', 'lifecycle', 'after'],
   elementTransform: ['affine2d', 'matrix3d'],
   pathSegment: ['move', 'line', 'quadratic', 'cubic', 'close'],
@@ -365,7 +365,6 @@ export const schemaParityWitnessRegistry: readonly WitnessFamily[] = [
     ['play-sequence', { kind: 'play-sequence', sequenceId: 'sequence', behavior: 'restart' }],
     ['stop-sequence', { kind: 'stop-sequence', sequenceId: 'sequence' }],
     ['seek-sequence', { kind: 'seek-sequence', sequenceId: 'sequence', tick: 0 }],
-    ['send-event', { kind: 'send-event', stateMachineId: 'machine', eventId: 'event' }],
   ], (value) => withDocument({ lifecycle: { id: 'lifecycle', in: [value], hold: [], update: [], out: [] } })),
   family('transitionTrigger', '/documents/0/stateMachines/0/transitions/0/trigger', [
     ['event', { kind: 'event', eventId: 'event' }],

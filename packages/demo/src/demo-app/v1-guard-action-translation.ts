@@ -365,8 +365,6 @@ export function actionToDraft(action: projectFormatV1.SequenceAction): SequenceA
       return { kind: 'stop-sequence', sequenceId: action.sequenceId };
     case 'seek-sequence':
       return { kind: 'seek-sequence', sequenceId: action.sequenceId, tick: action.tick };
-    case 'send-event':
-      return { kind: 'send-event', stateMachineId: action.stateMachineId, eventId: action.eventId };
   }
 }
 
@@ -395,15 +393,6 @@ export function actionDraftToModel(draft: SequenceActionDraft): projectFormatV1.
       const sequenceId = projectFormatV1.idSchema.safeParse(draft.sequenceId);
 
       return sequenceId.success ? { kind: 'seek-sequence', sequenceId: sequenceId.data, tick: draft.tick } : null;
-    }
-
-    case 'send-event': {
-      const stateMachineId = projectFormatV1.idSchema.safeParse(draft.stateMachineId);
-      const eventId = projectFormatV1.idSchema.safeParse(draft.eventId);
-
-      return stateMachineId.success && eventId.success ?
-          { kind: 'send-event', stateMachineId: stateMachineId.data, eventId: eventId.data }
-        : null;
     }
   }
 }

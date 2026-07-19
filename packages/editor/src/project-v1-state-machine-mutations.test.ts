@@ -1,7 +1,6 @@
 import { projectFormatV1 } from '@broadset/model';
 import { describe, expect, it } from 'vitest';
 
-import { setLifecyclePhaseActionsInProject } from './project-v1-lifecycle-mutations';
 import { reverseSequenceV1 } from './project-v1-reverse-sequence';
 import { addSequenceInProject, createSequenceV1 } from './project-v1-sequence-mutations';
 import {
@@ -138,33 +137,6 @@ describe('state machine transforms', () => {
     });
 
     expect(removed.documents[0]?.stateMachines).toEqual([]);
-  });
-
-  it('rejects removal while a lifecycle send-event action still references the machine', () => {
-    const createId = idFactory();
-    const { stateMachine, activateEventId } = createModifierStateMachine({ name: 'M', createId, activeValues: [] });
-    let project = upsertStateMachineInProject({
-      project: createMotionProject(),
-      documentId: id('doc-1'),
-      stateMachine,
-    });
-
-    project = addSequenceInProject({
-      project,
-      documentId: id('doc-1'),
-      sequence: createSequenceV1({ id: id('seq-1'), name: 'Intro', durationTicks: 60 }),
-    });
-    project = setLifecyclePhaseActionsInProject({
-      project,
-      documentId: id('doc-1'),
-      phase: 'in',
-      actions: [{ kind: 'send-event', stateMachineId: stateMachine.id, eventId: activateEventId }],
-      createId,
-    });
-
-    const next = removeStateMachineInProject({ project, documentId: id('doc-1'), stateMachineId: stateMachine.id });
-
-    expect(next).toBe(project);
   });
 });
 

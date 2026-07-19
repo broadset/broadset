@@ -80,8 +80,8 @@ export function removeStateMachineInProject(options: {
 
     return { ...document, stateMachines: document.stateMachines.filter(({ id }) => id !== options.stateMachineId) };
   });
-  // Dangling send-event references (lifecycle, entry/exit actions, transitions) fail semantic
-  // validation, so commitDocument returns the original project — removal is rejected, not partial.
+  // Nothing else in a document references a state machine by id, so this filter always succeeds —
+  // there is no dangling-reference rejection path here (unlike state/transition removal below).
 }
 
 const MODIFIER_TRANSITION_PRIORITY = 0;

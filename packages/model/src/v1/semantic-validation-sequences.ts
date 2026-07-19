@@ -52,25 +52,9 @@ function validateAudioAsset(indexes: SemanticIndexes, assetId: Id, pointer: stri
 function validateAction(
   action: SequenceAction,
   sequences: ReadonlyMap<Id, Sequence>,
-  document: DocumentSemanticIndex,
   pointer: string,
   diagnostics: Diagnostic[],
 ): void {
-  if (action.kind === 'send-event') {
-    const machine = document.stateMachines.get(action.stateMachineId);
-
-    if (machine === undefined)
-      diagnostics.push(
-        createSemanticError('state.missing-machine', 'State machine does not resolve', `${pointer}/stateMachineId`),
-      );
-    else if (document.stateMachineEvents.get(machine.id)?.has(action.eventId) !== true)
-      diagnostics.push(
-        createSemanticError('state.missing-event', 'State-machine event does not resolve', `${pointer}/eventId`),
-      );
-
-    return;
-  }
-
   const sequence = sequences.get(action.sequenceId);
 
   if (sequence === undefined) {
@@ -321,7 +305,6 @@ function validateStateMachines(
         validateAction(
           action,
           document.sequences,
-          document,
           `${statePointer}/entryActions/${String(actionPosition)}`,
           diagnostics,
         );
@@ -330,7 +313,6 @@ function validateStateMachines(
         validateAction(
           action,
           document.sequences,
-          document,
           `${statePointer}/exitActions/${String(actionPosition)}`,
           diagnostics,
         );
@@ -380,7 +362,6 @@ function validateStateMachines(
         validateAction(
           action,
           document.sequences,
-          document,
           `${transitionPointer}/actions/${String(actionPosition)}`,
           diagnostics,
         );
@@ -444,7 +425,6 @@ export function validateSequences(indexes: SemanticIndexes, diagnostics: Diagnos
           validateAction(
             action,
             document.sequences,
-            document,
             `${pointer}/lifecycle/${phase}/${String(index)}`,
             diagnostics,
           );

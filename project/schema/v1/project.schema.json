@@ -164,29 +164,6 @@
             "tick"
           ],
           "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "eventId": {
-              "$ref": "#/$defs/__schema0",
-              "type": "string"
-            },
-            "kind": {
-              "const": "send-event",
-              "type": "string"
-            },
-            "stateMachineId": {
-              "$ref": "#/$defs/__schema0",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "stateMachineId",
-            "eventId"
-          ],
-          "type": "object"
         }
       ]
     },

@@ -12,15 +12,12 @@ export type TransitionTriggerDraft =
 
 /**
  * A presentational, string-id-only draft of a `SequenceAction` (see `project/spec/model/format-reference.md`).
- * `send-event` is included only so an existing transition action round-trips losslessly through the
- * editor — it is never offered in the add-action menu and is rendered read-only, because it is
- * runtime-inert in the shipped playback pipeline.
+ * All three kinds are fully editable and addable in `TransitionActionsEditor`.
  */
 export type SequenceActionDraft =
   | { readonly kind: 'play-sequence'; readonly sequenceId: string; readonly behavior: 'restart' | 'resume' }
   | { readonly kind: 'stop-sequence'; readonly sequenceId: string }
-  | { readonly kind: 'seek-sequence'; readonly sequenceId: string; readonly tick: number }
-  | { readonly kind: 'send-event'; readonly stateMachineId: string; readonly eventId: string };
+  | { readonly kind: 'seek-sequence'; readonly sequenceId: string; readonly tick: number };
 
 export interface StateOptionView {
   readonly id: string;

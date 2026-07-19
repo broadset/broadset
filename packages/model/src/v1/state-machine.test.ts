@@ -24,7 +24,7 @@ describe('lifecycle and state machines', () => {
       id: 'lifecycle',
       in: [{ kind: 'play-sequence', sequenceId: 'in', behavior: 'restart' }],
       hold: [{ kind: 'seek-sequence', sequenceId: 'hold', tick: 0 }],
-      update: [{ kind: 'send-event', stateMachineId: 'visibility', eventId: 'refresh' }],
+      update: [{ kind: 'play-sequence', sequenceId: 'hold', behavior: 'resume' }],
       out: [{ kind: 'stop-sequence', sequenceId: 'in' }],
     } as const;
 

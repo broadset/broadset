@@ -39,7 +39,6 @@ describe('TransitionActionsEditor', () => {
       { kind: 'play-sequence', sequenceId: 'seq-1', behavior: 'restart' },
       { kind: 'stop-sequence', sequenceId: 'seq-2' },
       { kind: 'seek-sequence', sequenceId: 'seq-1', tick: 10 },
-      { kind: 'send-event', stateMachineId: 'sm-2', eventId: 'evt-1' },
     ];
 
     setup(actions);
@@ -48,7 +47,6 @@ describe('TransitionActionsEditor', () => {
     expect(screen.getByTestId('sm-transition-t-1-action-0')).toBeTruthy();
     expect(screen.getByTestId('sm-transition-t-1-action-1')).toBeTruthy();
     expect(screen.getByTestId('sm-transition-t-1-action-2')).toBeTruthy();
-    expect(screen.getByTestId('sm-transition-t-1-action-3')).toBeTruthy();
   });
 
   /** @description Picking "Seek sequence" in the add-action control and pressing Add action appends a valid default seek draft. */
@@ -186,19 +184,5 @@ describe('TransitionActionsEditor', () => {
 
     expect(within(addControl).getByRole('button', { name: /action kind/i })).toBeDisabled();
     expect(within(addControl).getByRole('button', { name: 'Add action' })).toBeDisabled();
-  });
-
-  /** @description A preserved send-event draft renders as read-only summary text (no sequence/machine picker) and remains removable. */
-  it('renders a send-event action read-only and lets it be removed', () => {
-    const actions: readonly SequenceActionDraft[] = [{ kind: 'send-event', stateMachineId: 'sm-2', eventId: 'evt-1' }];
-    const { onChange } = setup(actions);
-    const row = screen.getByTestId('sm-transition-t-1-action-0');
-
-    expect(within(row).queryByRole('button', { name: /sequence/i })).toBeNull();
-    expect(within(row).getByText('Send event (host-dispatched)')).toBeTruthy();
-
-    fireEvent.click(within(row).getByRole('button', { name: 'Remove action' }));
-
-    expect(onChange).toHaveBeenCalledWith([]);
   });
 });

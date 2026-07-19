@@ -79,13 +79,6 @@ function isValidUtcTimestampLiteral(value: string): boolean {
   return projectFormatV1.utcTimestampSchema.safeParse(value).success;
 }
 
-function resolveStateMachineName(
-  document: projectFormatV1.BroadsetDocumentV1,
-  stateMachineId: projectFormatV1.Id,
-): string {
-  return document.stateMachines.find(({ id }) => id === stateMachineId)?.name ?? stateMachineId;
-}
-
 /** Renders a lifecycle `SequenceAction` as a human-readable label, resolving ids to display names. */
 function describeSequenceAction(
   document: projectFormatV1.BroadsetDocumentV1,
@@ -98,8 +91,6 @@ function describeSequenceAction(
       return `Stop ${resolveSequenceName(document, action.sequenceId)}`;
     case 'seek-sequence':
       return `Seek ${resolveSequenceName(document, action.sequenceId)} @ ${String(action.tick)}`;
-    case 'send-event':
-      return `Send event to ${resolveStateMachineName(document, action.stateMachineId)}`;
   }
 }
 

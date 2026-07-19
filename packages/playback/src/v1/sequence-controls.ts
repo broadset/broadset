@@ -32,9 +32,6 @@ export function deriveActiveSequencesV1(options: {
 
   for (const { action: scheduled } of actions) {
     const action = scheduled.action;
-
-    if (action.kind === 'send-event') continue;
-
     const control = controls.get(action.sequenceId) ?? { active: false, originTick: scheduled.startTick, offsetTick: 0, stoppedAtTick: 0 };
 
     if (action.kind === 'play-sequence') {
