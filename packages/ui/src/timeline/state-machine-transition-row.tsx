@@ -9,6 +9,8 @@ import type { LifecyclePhase } from './animation-state-sections';
 import { rowStyle } from './state-machine-editor-styles';
 import type {
   EventOptionView,
+  GuardDraft,
+  GuardOperandOption,
   NewTransitionDraft,
   SequenceActionDraft,
   SequenceOptionView,
@@ -16,6 +18,7 @@ import type {
   TransitionTriggerDraft,
 } from './state-machine-editor-types';
 import { TransitionActionsEditor } from './transition-actions-editor';
+import { TransitionGuardEditor } from './transition-guard-editor';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -211,10 +214,14 @@ export interface StateMachineTransitionRowProps {
   readonly eventOptions: readonly EventOptionView[];
   readonly actions: readonly SequenceActionDraft[];
   readonly sequenceOptions: readonly SequenceOptionView[];
+  readonly guard: GuardDraft | undefined;
+  readonly guardIsAdvanced: boolean;
+  readonly guardOperands: readonly GuardOperandOption[];
   readonly onChangeTarget: (targetStateId: string) => void;
   readonly onChangeTrigger: (trigger: TransitionTriggerDraft) => void;
   readonly onChangePriority: (priority: number) => void;
   readonly onChangeActions: (actions: readonly SequenceActionDraft[]) => void;
+  readonly onChangeGuard: (guard: GuardDraft) => void;
   readonly onRemove: () => void;
 }
 
@@ -228,10 +235,14 @@ export function StateMachineTransitionRow({
   eventOptions,
   actions,
   sequenceOptions,
+  guard,
+  guardIsAdvanced,
+  guardOperands,
   onChangeTarget,
   onChangeTrigger,
   onChangePriority,
   onChangeActions,
+  onChangeGuard,
   onRemove,
 }: StateMachineTransitionRowProps): JSX.Element {
   const handlePriorityChange = (value: number): void => {
@@ -295,6 +306,14 @@ export function StateMachineTransitionRow({
         sequenceOptions={sequenceOptions}
         transitionId={transitionId}
         onChange={onChangeActions}
+      />
+
+      <TransitionGuardEditor
+        guard={guard}
+        guardIsAdvanced={guardIsAdvanced}
+        operands={guardOperands}
+        transitionId={transitionId}
+        onChange={onChangeGuard}
       />
     </div>
   );

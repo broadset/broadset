@@ -32,6 +32,7 @@ function setup(overrides: Partial<StateMachineEditorProps> = {}): StateMachineEd
     machine: buildMachine(),
     eventOptions: [{ id: 'evt-1', label: 'Click' }],
     sequenceOptions: [],
+    guardOperands: [],
     onAddState: vi.fn(),
     onRenameState: vi.fn(),
     onRemoveState: vi.fn(),

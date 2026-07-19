@@ -139,14 +139,15 @@ function NewStateRow({ onAddState }: { readonly onAddState: (name: string) => vo
 /**
  * Presentational editor for a single state machine's states and transitions. String-ids-only,
  * store-agnostic — the host (demo/editor) owns persistence and translates callbacks into store
- * mutations. Guard-expression editing is out of scope (see `project/spec` for the
- * animation-state-machine authoring surface backlog); per-transition sequence-action editing is
- * rendered via `TransitionActionsEditor` inside each `StateMachineTransitionRow`.
+ * mutations. Per-transition sequence-action editing is rendered via `TransitionActionsEditor`,
+ * and guard-predicate editing via `TransitionGuardEditor`, both inside each
+ * `StateMachineTransitionRow`.
  */
 export function StateMachineEditor({
   machine,
   eventOptions,
   sequenceOptions,
+  guardOperands,
   onAddState,
   onRenameState,
   onRemoveState,
@@ -155,9 +156,10 @@ export function StateMachineEditor({
   onUpdateTransition,
   onRemoveTransition,
 }: StateMachineEditorProps): JSX.Element {
-  // Defaulted once at this boundary: `sequenceOptions` is optional on the props contract so
-  // callers that predate per-transition action editing keep compiling unchanged.
+  // Defaulted once at this boundary: `sequenceOptions`/`guardOperands` are optional on the props
+  // contract so callers that predate per-transition action/guard editing keep compiling unchanged.
   const resolvedSequenceOptions = sequenceOptions ?? [];
+  const resolvedGuardOperands = guardOperands ?? [];
 
   return (
     <section
@@ -189,6 +191,9 @@ export function StateMachineEditor({
           <StateMachineTransitionRow
             actions={transition.actions ?? []}
             eventOptions={eventOptions}
+            guard={transition.guard}
+            guardIsAdvanced={transition.guardIsAdvanced ?? false}
+            guardOperands={resolvedGuardOperands}
             key={transition.id}
             priority={transition.priority}
             sequenceOptions={resolvedSequenceOptions}
@@ -199,6 +204,9 @@ export function StateMachineEditor({
             trigger={transition.trigger}
             onChangeActions={(actions) => {
               onUpdateTransition(transition.id, { actions });
+            }}
+            onChangeGuard={(guard) => {
+              onUpdateTransition(transition.id, { guard });
             }}
             onChangePriority={(priority) => {
               onUpdateTransition(transition.id, { priority });

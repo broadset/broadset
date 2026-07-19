@@ -34,6 +34,39 @@ export interface SequenceOptionView {
   readonly durationTicks: number;
 }
 
+/* ---- Guard predicate builder ---- */
+
+export type GuardValueType = 'boolean' | 'integer' | 'number' | 'string' | 'date-time';
+export type GuardOperator = 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte';
+
+export interface GuardOperandOption {
+  readonly id: string;
+  readonly label: string;
+  readonly valueType: GuardValueType;
+  /** Present for enum-schema string fields (their literal editor becomes a Select). */
+  readonly enumValues?: readonly string[];
+}
+
+export interface GuardLiteralDraft {
+  readonly valueType: GuardValueType;
+  readonly value: string | number | boolean;
+}
+
+export interface GuardClauseDraft {
+  /** UI-minted local clause id (stable within an editing session); not a branded model id. */
+  readonly id: string;
+  /** References a {@link GuardOperandOption.id}. */
+  readonly operandId: string;
+  readonly operator: GuardOperator;
+  readonly literal: GuardLiteralDraft;
+}
+
+export interface GuardDraft {
+  readonly connective: 'all' | 'any';
+  /** Empty clauses => no guard (model guard undefined). */
+  readonly clauses: readonly GuardClauseDraft[];
+}
+
 export interface StateMachineTransitionView {
   readonly id: string;
   readonly sourceStateId: string;
@@ -42,6 +75,10 @@ export interface StateMachineTransitionView {
   readonly priority: number;
   /** Optional so pre-PR-F callers keep compiling; treat an absent value as `[]` at the render boundary. */
   readonly actions?: readonly SequenceActionDraft[];
+  /** Present when the model guard fits the flat builder shape. */
+  readonly guard?: GuardDraft;
+  /** True when a model guard exists but is NOT flat-representable; shown read-only and preserved. */
+  readonly guardIsAdvanced?: boolean;
 }
 
 export interface StateMachineEditorView {
@@ -68,6 +105,8 @@ export interface TransitionUpdatePatch {
   readonly trigger?: TransitionTriggerDraft;
   readonly priority?: number;
   readonly actions?: readonly SequenceActionDraft[];
+  /** Present => set/replace/clear (empty clauses => clear); absent => no change. */
+  readonly guard?: GuardDraft;
 }
 
 export interface StateMachineEditorProps {
@@ -75,6 +114,8 @@ export interface StateMachineEditorProps {
   readonly eventOptions: readonly EventOptionView[];
   /** Optional so pre-PR-F callers keep compiling; treat an absent value as `[]` at the render boundary. */
   readonly sequenceOptions?: readonly SequenceOptionView[];
+  /** Optional so pre-PR-F callers keep compiling; treat an absent value as `[]` at the render boundary. */
+  readonly guardOperands?: readonly GuardOperandOption[];
   readonly onAddState: (name: string) => void;
   readonly onRenameState: (stateId: string, name: string) => void;
   readonly onRemoveState: (stateId: string) => void;
