@@ -4,15 +4,18 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 
 import { NumField } from '../inputs';
-import { color, font } from '../tokens';
+import { color, font, sp } from '../tokens';
 import type { LifecyclePhase } from './animation-state-sections';
 import { rowStyle } from './state-machine-editor-styles';
 import type {
   EventOptionView,
   NewTransitionDraft,
+  SequenceActionDraft,
+  SequenceOptionView,
   StateOptionView,
   TransitionTriggerDraft,
 } from './state-machine-editor-types';
+import { TransitionActionsEditor } from './transition-actions-editor';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -206,9 +209,12 @@ export interface StateMachineTransitionRowProps {
   readonly priority: number;
   readonly states: readonly StateOptionView[];
   readonly eventOptions: readonly EventOptionView[];
+  readonly actions: readonly SequenceActionDraft[];
+  readonly sequenceOptions: readonly SequenceOptionView[];
   readonly onChangeTarget: (targetStateId: string) => void;
   readonly onChangeTrigger: (trigger: TransitionTriggerDraft) => void;
   readonly onChangePriority: (priority: number) => void;
+  readonly onChangeActions: (actions: readonly SequenceActionDraft[]) => void;
   readonly onRemove: () => void;
 }
 
@@ -220,9 +226,12 @@ export function StateMachineTransitionRow({
   priority,
   states,
   eventOptions,
+  actions,
+  sequenceOptions,
   onChangeTarget,
   onChangeTrigger,
   onChangePriority,
+  onChangeActions,
   onRemove,
 }: StateMachineTransitionRowProps): JSX.Element {
   const handlePriorityChange = (value: number): void => {
@@ -234,47 +243,59 @@ export function StateMachineTransitionRow({
   };
 
   return (
-    <div data-testid={`sm-transition-${transitionId}`} style={rowStyle()}>
-      <span style={{ color: color('muted'), fontSize: font('label') }}>{sourceStateName}</span>
+    <div
+      data-testid={`sm-transition-${transitionId}`}
+      style={{ display: 'flex', flexDirection: 'column', gap: sp('sp-02') }}
+    >
+      <div style={rowStyle()}>
+        <span style={{ color: color('muted'), fontSize: font('label') }}>{sourceStateName}</span>
 
-      <Select
-        aria-label="Target state"
-        value={targetStateId}
-        onChange={(key) => {
-          if (key === null) return;
+        <Select
+          aria-label="Target state"
+          value={targetStateId}
+          onChange={(key) => {
+            if (key === null) return;
 
-          onChangeTarget(String(key));
-        }}
-      >
-        <Select.Trigger>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover>
-          <ListBox>
-            {states.map((state) => (
-              <ListBox.Item id={state.id} key={state.id} textValue={state.name}>
-                {state.name}
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
-      </Select>
+            onChangeTarget(String(key));
+          }}
+        >
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {states.map((state) => (
+                <ListBox.Item id={state.id} key={state.id} textValue={state.name}>
+                  {state.name}
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
 
-      <TriggerDraftEditor eventOptions={eventOptions} trigger={trigger} onChange={onChangeTrigger} />
+        <TriggerDraftEditor eventOptions={eventOptions} trigger={trigger} onChange={onChangeTrigger} />
 
-      <NumField
-        label="Priority"
-        min={MIN_PRIORITY}
-        step={NUMBER_STEP}
-        value={priority}
-        onChange={handlePriorityChange}
+        <NumField
+          label="Priority"
+          min={MIN_PRIORITY}
+          step={NUMBER_STEP}
+          value={priority}
+          onChange={handlePriorityChange}
+        />
+
+        <Button aria-label="Remove transition" size="sm" variant="danger" onPress={onRemove}>
+          <Trash2 size={ICON_SIZE} />
+          Remove
+        </Button>
+      </div>
+
+      <TransitionActionsEditor
+        actions={actions}
+        sequenceOptions={sequenceOptions}
+        transitionId={transitionId}
+        onChange={onChangeActions}
       />
-
-      <Button aria-label="Remove transition" size="sm" variant="danger" onPress={onRemove}>
-        <Trash2 size={ICON_SIZE} />
-        Remove
-      </Button>
     </div>
   );
 }

@@ -20,6 +20,7 @@ function buildMachine(overrides: Partial<StateMachineEditorView> = {}): StateMac
         targetStateId: 'inactive',
         trigger: { kind: 'lifecycle', phase: 'out' },
         priority: 0,
+        actions: [],
       },
     ],
     ...overrides,
@@ -30,6 +31,7 @@ function setup(overrides: Partial<StateMachineEditorProps> = {}): StateMachineEd
   const props: StateMachineEditorProps = {
     machine: buildMachine(),
     eventOptions: [{ id: 'evt-1', label: 'Click' }],
+    sequenceOptions: [],
     onAddState: vi.fn(),
     onRenameState: vi.fn(),
     onRemoveState: vi.fn(),

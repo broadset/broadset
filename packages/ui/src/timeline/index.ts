@@ -12,3 +12,4 @@ export * from './timeline-lanes';
 export * from './timeline-math';
 export * from './timeline-ruler';
 export * from './timeline-types';
+export * from './transition-actions-editor';

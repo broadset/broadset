@@ -139,12 +139,14 @@ function NewStateRow({ onAddState }: { readonly onAddState: (name: string) => vo
 /**
  * Presentational editor for a single state machine's states and transitions. String-ids-only,
  * store-agnostic — the host (demo/editor) owns persistence and translates callbacks into store
- * mutations. Guard-expression editing and per-transition sequence-action editing are out of
- * scope (see `project/spec` for the animation-state-machine authoring surface backlog).
+ * mutations. Guard-expression editing is out of scope (see `project/spec` for the
+ * animation-state-machine authoring surface backlog); per-transition sequence-action editing is
+ * rendered via `TransitionActionsEditor` inside each `StateMachineTransitionRow`.
  */
 export function StateMachineEditor({
   machine,
   eventOptions,
+  sequenceOptions,
   onAddState,
   onRenameState,
   onRemoveState,
@@ -153,6 +155,10 @@ export function StateMachineEditor({
   onUpdateTransition,
   onRemoveTransition,
 }: StateMachineEditorProps): JSX.Element {
+  // Defaulted once at this boundary: `sequenceOptions` is optional on the props contract so
+  // callers that predate per-transition action editing keep compiling unchanged.
+  const resolvedSequenceOptions = sequenceOptions ?? [];
+
   return (
     <section
       aria-label={`State machine: ${machine.name}`}
@@ -181,14 +187,19 @@ export function StateMachineEditor({
 
         {machine.transitions.map((transition) => (
           <StateMachineTransitionRow
+            actions={transition.actions ?? []}
             eventOptions={eventOptions}
             key={transition.id}
             priority={transition.priority}
+            sequenceOptions={resolvedSequenceOptions}
             sourceStateName={resolveStateName(machine.states, transition.sourceStateId)}
             states={machine.states}
             targetStateId={transition.targetStateId}
             transitionId={transition.id}
             trigger={transition.trigger}
+            onChangeActions={(actions) => {
+              onUpdateTransition(transition.id, { actions });
+            }}
             onChangePriority={(priority) => {
               onUpdateTransition(transition.id, { priority });
             }}
