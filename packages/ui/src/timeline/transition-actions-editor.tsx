@@ -64,6 +64,22 @@ function removeAt<T>(items: readonly T[], index: number): readonly T[] {
   return items.filter((_, i) => i !== index);
 }
 
+/**
+ * Resolves the upper bound a seek-sequence tick may not exceed. When `sequenceId` resolves to a
+ * known sequence, that is its `durationTicks`. When it doesn't (an orphaned reference, e.g. the
+ * sequence was deleted elsewhere), the bound falls back to the action's own current tick — an
+ * unvalidated reference must never let the tick be raised, only lowered or left unchanged.
+ */
+function resolveMaxTick(
+  sequenceOptions: readonly SequenceOptionView[],
+  sequenceId: string,
+  currentTick: number,
+): number {
+  const durationTicks = sequenceOptions.find((option) => option.id === sequenceId)?.durationTicks;
+
+  return durationTicks ?? currentTick;
+}
+
 /** Swaps two entries by index. Returns the original array unchanged if either index is out of range. */
 function swapAt<T>(items: readonly T[], indexA: number, indexB: number): readonly T[] {
   const itemA = items[indexA];
@@ -276,7 +292,7 @@ function TransitionActionRow({
   }
 
   if (action.kind === 'seek-sequence') {
-    const selectedSequence = sequenceOptions.find((option) => option.id === action.sequenceId);
+    const maxTick = resolveMaxTick(sequenceOptions, action.sequenceId, action.tick);
 
     return (
       <div data-testid={testId} style={rowStyle()}>
@@ -284,7 +300,9 @@ function TransitionActionRow({
           sequenceId={action.sequenceId}
           sequenceOptions={sequenceOptions}
           onChange={(sequenceId) => {
-            onChangeAction({ ...action, sequenceId });
+            const clampedTick = Math.min(action.tick, resolveMaxTick(sequenceOptions, sequenceId, action.tick));
+
+            onChangeAction({ ...action, sequenceId, tick: clampedTick });
           }}
         />
         <NumField
@@ -296,7 +314,7 @@ function TransitionActionRow({
             const tick = Math.round(value);
 
             if (!Number.isSafeInteger(tick) || tick < MIN_TICK) return;
-            if (selectedSequence !== undefined && tick > selectedSequence.durationTicks) return;
+            if (tick > maxTick) return;
 
             onChangeAction({ ...action, tick });
           }}

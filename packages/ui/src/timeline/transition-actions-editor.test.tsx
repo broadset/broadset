@@ -9,6 +9,11 @@ const SEQUENCE_OPTIONS: readonly SequenceOptionView[] = [
   { id: 'seq-2', name: 'Outro', durationTicks: 50 },
 ];
 
+const LONG_SHORT_SEQUENCE_OPTIONS: readonly SequenceOptionView[] = [
+  { id: 'seq-long', name: 'Long', durationTicks: 1000 },
+  { id: 'seq-short', name: 'Short', durationTicks: 100 },
+];
+
 function setup(
   actions: readonly SequenceActionDraft[],
   sequenceOptions: readonly SequenceOptionView[] = SEQUENCE_OPTIONS,
@@ -87,6 +92,55 @@ describe('TransitionActionsEditor', () => {
     fireEvent.blur(tickInput);
 
     expect(onChange).toHaveBeenCalledWith([{ kind: 'seek-sequence', sequenceId: 'seq-2', tick: 25 }]);
+  });
+
+  /**
+   * @description Switching a seek-sequence action's sequence Select to a sequence with a smaller
+   * durationTicks must clamp the stale tick down — never emit an out-of-bounds {sequenceId, tick}.
+   */
+  it('clamps the seek tick when switching to a sequence with a smaller duration', () => {
+    const actions: readonly SequenceActionDraft[] = [{ kind: 'seek-sequence', sequenceId: 'seq-long', tick: 900 }];
+    const { onChange } = setup(actions, LONG_SHORT_SEQUENCE_OPTIONS);
+    const row = screen.getByTestId('sm-transition-t-1-action-0');
+
+    fireEvent.click(within(row).getByRole('button', { name: /sequence/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'Short' }));
+
+    expect(onChange).toHaveBeenCalledWith([{ kind: 'seek-sequence', sequenceId: 'seq-short', tick: 100 }]);
+  });
+
+  /** @description Switching to a sequence with a larger duration leaves an in-bounds tick unchanged. */
+  it('keeps the seek tick unchanged when switching to a sequence with a larger duration', () => {
+    const actions: readonly SequenceActionDraft[] = [{ kind: 'seek-sequence', sequenceId: 'seq-short', tick: 80 }];
+    const { onChange } = setup(actions, LONG_SHORT_SEQUENCE_OPTIONS);
+    const row = screen.getByTestId('sm-transition-t-1-action-0');
+
+    fireEvent.click(within(row).getByRole('button', { name: /sequence/i }));
+    fireEvent.click(screen.getByRole('option', { name: 'Long' }));
+
+    expect(onChange).toHaveBeenCalledWith([{ kind: 'seek-sequence', sequenceId: 'seq-long', tick: 80 }]);
+  });
+
+  /**
+   * @description When a seek action's sequenceId is not resolvable in sequenceOptions (an orphaned
+   * reference), the tick's upper bound falls back to its own current value — it can be lowered but
+   * never raised past a bound that can't be validated.
+   */
+  it('does not allow raising the tick when the action references a sequence missing from sequenceOptions', () => {
+    const actions: readonly SequenceActionDraft[] = [{ kind: 'seek-sequence', sequenceId: 'seq-deleted', tick: 40 }];
+    const { onChange } = setup(actions, LONG_SHORT_SEQUENCE_OPTIONS);
+    const row = screen.getByTestId('sm-transition-t-1-action-0');
+    const tickInput = within(row).getByLabelText('Tick', { selector: 'input' });
+
+    fireEvent.change(tickInput, { target: { value: '50' } });
+    fireEvent.blur(tickInput);
+
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.change(tickInput, { target: { value: '20' } });
+    fireEvent.blur(tickInput);
+
+    expect(onChange).toHaveBeenCalledWith([{ kind: 'seek-sequence', sequenceId: 'seq-deleted', tick: 20 }]);
   });
 
   /** @description Clicking Remove on a row emits the drafts array with that index removed. */
